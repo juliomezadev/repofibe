@@ -68,6 +68,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 |---|---|---|
 | `/fabrica` | **Orquestador** | Dashboard del sprint, detecta la etapa, encadena la siguiente skill. Empieza aquí |
 | `/oficina` | **Socio de YC** | Seis preguntas forzadas que reencuadran el producto antes de escribir código. Produce el doc de diseño |
+| `/spec` | **Autor de specs** | Intención vaga → spec ejecutable en 5 fases, con gate de calidad 7/10 y redacción de secretos |
 | `/plan-ceo` | **CEO fundador** | Reta premisas, busca el producto de 10 estrellas. Modos: expansión / selectiva / mantener / reducción |
 | `/plan-ing` | **Eng manager** | Flujo de datos ASCII, estados, casos borde, matriz de pruebas, modos de fallo. Veredicto: FIRMADO o DEVUELTO |
 | `/plan-diseno` | **Diseñadora senior** | Seis dimensiones 0-10 con "cómo se ve un 10". Detector de AI slop |
@@ -103,8 +104,8 @@ skills, manifiestos, hooks — y ejecuta de verdad `estado`, `memoria` y
 
 ## Hoja de ruta
 
-- **v0.2** — `/spec`, navegador propio con daemon persistente para `/qa`,
-  evals tier 2 (E2E), chequeo de actualización por sesión.
+- **v0.2** — navegador propio con daemon persistente para `/qa`,
+  evals tier 2 (E2E), modo checkpoint continuo.
 - **v0.3** — skills de diseño generativo, `/docs` (Diataxis), segunda
   opinión cross-modelo, evals tier 3 (LLM-juez).
 - **v0.4** — canary post-deploy, benchmark de rendimiento, memoria

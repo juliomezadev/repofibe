@@ -27,7 +27,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Preámbulo compartido entre skills | ✅ `plantillas/` | **Mejora**: sin build step, sin drift |
 | Enrutamiento inteligente de revisiones | ✅ en `/fabrica` | |
 | /autoplan (pipeline CEO→diseño→ing automático) | ✅ `/autoplan` | **Mejora**: 6 principios de auto-decisión y cada decisión queda marcada en el plan (auditable); solo el gusto llega al usuario, en un solo lote |
-| /spec (intent→spec en 5 fases) | ⏳ v0.2 | |
+| /spec (intent→spec en 5 fases) | ✅ `/spec` | Gate de calidad 7/10 auto-puntuado, dedupe contra specs previas, redacción de secretos fail-closed |
 | /context-save, /context-restore | 🔶 | El estado del sprint + hook SessionStart cubren el caso principal; falta snapshot completo de contexto |
 | Modo checkpoint continuo (WIP commits) | ⏳ v0.2 | |
 
@@ -77,7 +77,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Telemetría opt-in a Supabase | 🚫 | Decisión de privacidad: analítica local siempre, remota nunca por defecto |
 | Defensa anti prompt-injection (clasificador ML, canary) | ⏳ v0.2+ | El canary token y las reglas de contenido no confiable no requieren ML y entran antes |
 | iOS QA en dispositivo real | 🚫 | Exige Mac; contradice Windows-first |
-| Auto-update check por sesión | ⏳ v0.2 | Hook SessionStart ya existe; añadir chequeo de versión throttled |
+| Auto-update check por sesión | ✅ en `sesion.mjs` | Throttled 1/hora, tolerante a red caída, solo clones git, timeout 4s |
 
 ## Ventajas de repofibe que gstack no tiene
 

@@ -4,13 +4,41 @@
 // proyecto. Así cualquier sesión nueva retoma el contexto sin que el usuario
 // tenga que repetirlo. Silencioso si no hay nada que decir. Fail-open.
 
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+
+// Chequeo de actualización: throttled a 1/hora, tolerante a fallos de red,
+// silencioso salvo que de verdad haya versión nueva. Solo aplica si la raíz
+// de repofibe es un clon git (instalaciones por copia no se auto-chequean).
+function chequearActualizacion() {
+  try {
+    const raiz = dirname(dirname(fileURLToPath(import.meta.url)));
+    if (!existsSync(join(raiz, ".git"))) return null;
+    const sello = join(homedir(), ".repofibe", "ultima-verificacion");
+    if (existsSync(sello) && Date.now() - statSync(sello).mtimeMs < 3600_000) return null;
+    mkdirSync(dirname(sello), { recursive: true });
+    writeFileSync(sello, new Date().toISOString());
+    const git = (args) => execFileSync("git", ["-C", raiz, ...args], { encoding: "utf8", timeout: 4000, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    git(["fetch", "--quiet"]);
+    const local = git(["rev-parse", "HEAD"]);
+    const remoto = git(["rev-parse", "@{u}"]);
+    if (local !== remoto && git(["merge-base", "HEAD", "@{u}"]) === local) {
+      return `[repofibe] Hay una actualización disponible: ejecuta "git -C ${raiz} pull" y reinstala (instalar.ps1 / instalar.sh).`;
+    }
+    return null;
+  } catch { return null; }
+}
 
 try {
   const entrada = JSON.parse(readFileSync(0, "utf8"));
   const cwd = entrada.cwd ?? process.cwd();
   const partes = [];
+
+  const aviso = chequearActualizacion();
+  if (aviso) partes.push(aviso);
 
   const sprint = (() => {
     try { return JSON.parse(readFileSync(join(cwd, ".fabrica", "sprint.json"), "utf8")); }
@@ -38,7 +66,7 @@ try {
   if (partes.length) {
     process.stdout.write(
       "[repofibe] Contexto de la fábrica:\n" + partes.join("\n") +
-      "\nSkills: /fabrica (orquestador), /oficina, /plan-ceo, /plan-ing, /plan-diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian.\n"
+      "\nSkills: /fabrica (orquestador), /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian.\n"
     );
   }
   process.exit(0);

@@ -8,6 +8,12 @@ Todas las novedades de repofibe, versión por versión.
   en un solo comando. Auto-decide lo objetivo con seis principios codificados
   y deja cada decisión marcada en el plan; solo las decisiones de gusto
   llegan al usuario, agrupadas en un lote.
+- **`/spec`**: intención vaga → spec ejecutable en cinco fases, con lectura
+  de código obligatoria, dedupe contra specs previas, gate de calidad
+  auto-puntuado (≥7/10 o no se archiva) y redacción de secretos fail-closed.
+- **Chequeo de actualización por sesión** en el hook SessionStart: throttled
+  a una vez por hora, tolerante a red caída, solo para instalaciones vía
+  clon git.
 
 ## 0.1.0 — 2026-07-18
 
