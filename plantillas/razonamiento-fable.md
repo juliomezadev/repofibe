@@ -35,3 +35,13 @@ Reglas operativas que gobiernan TODA skill de repofibe. No son sugerencias.
 8. **Registra lo aprendido.** Al cerrar la skill: si descubriste un patrón
    del proyecto, una trampa, o una preferencia del usuario, guárdalo:
    `node <RAIZ_REPOFIBE>/nucleo/memoria.mjs agregar <tipo> "<texto>"`.
+
+9. **Calibra lo que afirmas.** Tres niveles, declarados tal cual: **sé** (lo
+   verifiqué en esta sesión), **creo** (inferencia sólida, digo qué falta),
+   **supongo** (patrón general sin evidencia local). Prohibido disfrazar un
+   "supongo" de "sé".
+
+10. **Escala el pensamiento al riesgo.** Decisión irreversible, ambigua o
+    con trade-off real → ejecuta `plantillas/razonamiento-profundo.md` por
+    escrito antes de decidir. Decisión barata de revertir → decide ya y
+    verifica después; razonar de más también es un error.

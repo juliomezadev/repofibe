@@ -81,6 +81,13 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 
 ## Ventajas de repofibe que gstack no tiene
 
+0. **El razonamiento como artefacto de primera clase**: el playbook de
+   razonamiento profundo (`plantillas/razonamiento-profundo.md`) + la skill
+   `/razonar` hacen que CUALQUIER modelo en CUALQUIER host (Gemini en
+   Antigravity, Codex, Claude) piense con el mismo método: descomposición
+   por valor de información, verificar antes de opinar, alternativas con
+   condición de arrepentimiento, pre-mortem, calibración sé/creo/supongo.
+   gstack tiene un ethos; repofibe tiene un método ejecutable.
 1. **Guardias deterministas por hook** (ask/deny ejecutado por el harness).
 2. **Estado de sprint explícito y reanudable** entre sesiones, hosts y agentes.
 3. **`/construir` como skill de primera clase** con disciplina codificada.

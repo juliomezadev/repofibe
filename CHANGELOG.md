@@ -14,6 +14,11 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/razonar` + playbook de razonamiento profundo**: el método de
+  razonamiento de Fable como artefacto ejecutable (descomposición por valor
+  de información, evidencia en contra, pre-mortem, calibración
+  sé/creo/supongo). El preámbulo lo activa automáticamente ante decisiones
+  irreversibles o ambiguas en cualquier skill, en cualquier host.
 
 ## 0.1.0 — 2026-07-18
 

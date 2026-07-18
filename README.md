@@ -67,6 +67,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | Skill | Especialista | Qué hace |
 |---|---|---|
 | `/fabrica` | **Orquestador** | Dashboard del sprint, detecta la etapa, encadena la siguiente skill. Empieza aquí |
+| `/razonar` | **Razonamiento Fable** | El playbook profundo aplicado por escrito: descomposición por valor de información, alternativas con condición de arrepentimiento, pre-mortem, calibración sé/creo/supongo |
 | `/oficina` | **Socio de YC** | Seis preguntas forzadas que reencuadran el producto antes de escribir código. Produce el doc de diseño |
 | `/spec` | **Autor de specs** | Intención vaga → spec ejecutable en 5 fases, con gate de calidad 7/10 y redacción de secretos |
 | `/plan-ceo` | **CEO fundador** | Reta premisas, busca el producto de 10 estrellas. Modos: expansión / selectiva / mantener / reducción |

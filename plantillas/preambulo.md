@@ -4,7 +4,11 @@
 `plantillas/` donde vive este archivo).
 
 1. **Carga el protocolo.** Lee `plantillas/razonamiento-fable.md` (misma
-   carpeta que este archivo) si no lo has leído en esta sesión.
+   carpeta que este archivo) si no lo has leído en esta sesión. Si en
+   cualquier punto de la skill aparece una decisión **irreversible, ambigua
+   o con trade-off genuino**, carga también
+   `plantillas/razonamiento-profundo.md` y ejecútalo por escrito (o invoca
+   la skill `/razonar`) antes de decidir.
 
 2. **Carga el estado del sprint.** Ejecuta:
    ```
