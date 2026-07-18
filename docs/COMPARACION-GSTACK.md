@@ -83,6 +83,14 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 
 ## Ventajas de repofibe que gstack no tiene
 
+-2. **`/legal` — asesor jurídico colombiano**: gstack no tiene nada legal.
+   repofibe razona derecho colombiano para decisiones de producto (Ley
+   1581/2012 datos, Ley 1273/2009 delitos informáticos, Ley 527/1999
+   e-commerce, Ley 1480/2011 consumidor, Ley 23/1982 software como obra),
+   con mapa normativo de orientación, integración con plugins legales del
+   host (privacy-legal), calibración sé/creo/supongo obligatoria y regla
+   dura contra citar artículos con certeza fingida.
+
 -1. **`/complejo` — problemas más grandes que un contexto**: gstack no tiene
    nada para trabajo multi-sesión de alta incertidumbre. repofibe lo resuelve
    como lo resuelve Fable: cuaderno de razonamiento en disco

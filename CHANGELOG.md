@@ -14,6 +14,12 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/legal`**: asesor legal para builders con razonamiento en derecho
+  colombiano — mapa normativo (datos personales, delitos informáticos,
+  e-commerce, consumidor, software como obra), método hechos→calificación→
+  norma→riesgo calibrado→checklist accionable, integración con plugins
+  legales del host, y marco de honestidad: nunca citar artículos con
+  certeza fingida, verificación en fuente oficial cuando el detalle importa.
 - **Integración graphify**: `/grafo` usa una jerarquía de motores —
   graphify si está instalado (AST 25 lenguajes, `/graphify query|path|
   explain`, etiquetas EXTRACTED/INFERRED/AMBIGUOUS, hook de auto-rebuild

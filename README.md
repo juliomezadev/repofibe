@@ -90,6 +90,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/memoria` | **Memoria** | Aprendizajes, trampas, decisiones y gustos que persisten entre sesiones |
 | `/seguridad` | **CSO** | OWASP + STRIDE con gate de confianza ≥8/10: cero ruido, cada hallazgo con exploit concreto |
 | `/guardian` | **Guardias** | Enciende/apaga las protecciones deterministas; congela ediciones a un directorio |
+| `/legal` | **Asesor legal CO** | Razonamiento en derecho colombiano para builders: datos personales (Ley 1581, SIC), delitos informáticos (Ley 1273), e-commerce (Ley 527, Ley 1480), software como obra. Se integra con plugins legales del host. Calibración sé/creo/supongo obligatoria |
 
 ## Lo que la fábrica recuerda
 
