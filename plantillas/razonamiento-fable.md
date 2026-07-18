@@ -45,3 +45,10 @@ Reglas operativas que gobiernan TODA skill de repofibe. No son sugerencias.
     con trade-off real → ejecuta `plantillas/razonamiento-profundo.md` por
     escrito antes de decidir. Decisión barata de revertir → decide ya y
     verifica después; razonar de más también es un error.
+
+11. **Lectura quirúrgica.** Para orientarte en un repo o catálogo grande:
+    primero la estructura (listado, índice, nombres), después búsqueda
+    dirigida (Grep con términos concretos), y el archivo completo SOLO
+    cuando confirmaste que es el objetivo. Prohibido leerlo todo "para
+    tener contexto": el contexto es un recurso finito y se gasta donde
+    decide algo.

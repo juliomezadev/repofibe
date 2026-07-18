@@ -48,7 +48,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
-| /design-consultation (sistema de diseño) | ⏳ v0.3 | |
+| /design-consultation (sistema de diseño) | ✅ `/diseno` | **Mejora**: calibra contra ~75 sistemas de diseño reales (awesome-design-md) con lectura quirúrgica por sector/mood; deriva desde el producto, con porqués por token y prohibiciones anti-slop bloqueantes |
 | /design-shotgun (variantes + tablero + taste memory) | ⏳ v0.3 | Taste memory ya tiene hogar: memoria tipo `gusto` |
 | /design-html (Pretext) | 🚫 como tal | Pretext es apuesta propia de gstack; evaluaremos generación HTML de calidad sin esa dependencia |
 | /design-review en vivo | ⏳ v0.3 | Requiere navegador (v0.2) |

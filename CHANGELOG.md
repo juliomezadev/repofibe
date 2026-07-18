@@ -14,6 +14,14 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/diseno`**: consultoría de diseño y frontend que razona — entrevista
+  con anti-adjetivo, recuperación quirúrgica del catálogo awesome-design-md
+  (3-5 referentes por sector, jamás las ~75 fichas), sistema derivado del
+  producto con porqué por token, y prohibiciones anti-slop bloqueantes.
+  Produce DISENO.md que consumen /plan-diseno, /construir y /qa.
+- **Regla 11 del protocolo — lectura quirúrgica**: estructura → búsqueda
+  dirigida → archivo completo solo confirmado el objetivo. Prohibido leer
+  todo "para tener contexto".
 - **Auto-actualización real**: al detectar versión nueva, la sesión hace
   `git pull --ff-only` y refresca las skills en todos los destinos
   instalados (`instalar.mjs --refrescar`) — quien tenga repofibe se
