@@ -14,6 +14,12 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/docs`**: documentación Diataxis en dos modos — actualizar (cruza el
+  diff shipeado contra todos los docs y corrige el drift con hallazgos
+  archivo:línea) y generar (investiga el código primero, elige el tipo
+  correcto: tutorial/cómo-hacer/referencia/explicación). Regla dura: todo
+  comando documentado se ejecuta antes de documentarse. Mapa de cobertura
+  módulo × tipo al cierre.
 - **`/legal`**: asesor legal para builders con razonamiento en derecho
   colombiano — mapa normativo (datos personales, delitos informáticos,
   e-commerce, consumidor, software como obra), método hechos→calificación→

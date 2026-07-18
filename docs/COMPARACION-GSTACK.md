@@ -57,7 +57,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
-| /document-release + /document-generate (Diataxis) | ⏳ v0.3 | /shipear ya audita docs drift (paso 5) — falta la generación completa |
+| /document-release + /document-generate (Diataxis) | ✅ `/docs` | Una skill, dos modos (actualizar drift / generar desde cero). **Mejora**: todo comando documentado se EJECUTA antes de documentarse — los docs no pueden mentir |
 | /land-and-deploy + /setup-deploy | ⏳ v0.3 | |
 | /canary (monitoreo post-deploy) | ⏳ v0.4 | |
 | /benchmark (Core Web Vitals) | ⏳ v0.4 | |

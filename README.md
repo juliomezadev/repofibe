@@ -87,6 +87,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/qa` | **QA con ojos** | Ejecuta la app de verdad (navegador/CLI/API), corrige, y cada fix trae test de regresión. `/qa solo-reporte` no toca código |
 | `/shipear` | **Release engineer** | Base al día, suite, cobertura, versión, changelog, docs, PR |
 | `/retro` | **Eng manager** | Datos reales de la semana → UNA mejora accionable |
+| `/docs` | **Technical writer** | Diataxis en dos modos: actualizar drift tras shipear / generar desde cero. Todo comando documentado se ejecuta antes — los docs no mienten |
 | `/memoria` | **Memoria** | Aprendizajes, trampas, decisiones y gustos que persisten entre sesiones |
 | `/seguridad` | **CSO** | OWASP + STRIDE con gate de confianza ≥8/10: cero ruido, cada hallazgo con exploit concreto |
 | `/guardian` | **Guardias** | Enciende/apaga las protecciones deterministas; congela ediciones a un directorio |
