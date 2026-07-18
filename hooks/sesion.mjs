@@ -38,7 +38,7 @@ try {
   if (partes.length) {
     process.stdout.write(
       "[repofibe] Contexto de la fábrica:\n" + partes.join("\n") +
-      "\nSkills: /fabrica (orquestador), /oficina, /plan-ceo, /plan-ing, /plan-diseno, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian.\n"
+      "\nSkills: /fabrica (orquestador), /oficina, /plan-ceo, /plan-ing, /plan-diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian.\n"
     );
   }
   process.exit(0);

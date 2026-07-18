@@ -26,7 +26,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | /careful, /freeze, /guard, /unfreeze | ✅ `/guardian` | **Mejora estructural**: hook determinista, no prompt |
 | Preámbulo compartido entre skills | ✅ `plantillas/` | **Mejora**: sin build step, sin drift |
 | Enrutamiento inteligente de revisiones | ✅ en `/fabrica` | |
-| /autoplan (pipeline CEO→diseño→ing automático) | ⏳ v0.2 | Encadenar con principios de decisión codificados |
+| /autoplan (pipeline CEO→diseño→ing automático) | ✅ `/autoplan` | **Mejora**: 6 principios de auto-decisión y cada decisión queda marcada en el plan (auditable); solo el gusto llega al usuario, en un solo lote |
 | /spec (intent→spec en 5 fases) | ⏳ v0.2 | |
 | /context-save, /context-restore | 🔶 | El estado del sprint + hook SessionStart cubren el caso principal; falta snapshot completo de contexto |
 | Modo checkpoint continuo (WIP commits) | ⏳ v0.2 | |

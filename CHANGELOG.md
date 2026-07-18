@@ -2,6 +2,13 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## Sin publicar
+
+- **`/autoplan`**: las tres revisiones del plan (CEO → diseño → ingeniería)
+  en un solo comando. Auto-decide lo objetivo con seis principios codificados
+  y deja cada decisión marcada en el plan; solo las decisiones de gusto
+  llegan al usuario, agrupadas en un lote.
+
 ## 0.1.0 — 2026-07-18
 
 Primera versión. El núcleo de la fábrica:
