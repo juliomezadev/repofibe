@@ -81,6 +81,12 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 
 ## Ventajas de repofibe que gstack no tiene
 
+-1. **`/complejo` — problemas más grandes que un contexto**: gstack no tiene
+   nada para trabajo multi-sesión de alta incertidumbre. repofibe lo resuelve
+   como lo resuelve Fable: cuaderno de razonamiento en disco
+   (`.fabrica/problemas/<slug>.md`) con DEMOSTRADO/SUPUESTOS/DECISIONES que
+   sobrevive a sesiones y agentes, árbol de dependencias recursivo, spikes
+   contra la mayor incertidumbre primero, e integración continua del todo.
 0. **El razonamiento como artefacto de primera clase**: el playbook de
    razonamiento profundo (`plantillas/razonamiento-profundo.md`) + la skill
    `/razonar` hacen que CUALQUIER modelo en CUALQUIER host (Gemini en

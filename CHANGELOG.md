@@ -14,6 +14,12 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/complejo`**: problemas muy complejos (multi-día, multi-módulo, alta
+  incertidumbre) con el método Fable completo: cuaderno de razonamiento
+  persistente en `.fabrica/problemas/`, árbol de dependencias, ataque por
+  valor de información con spikes, integración continua y subagentes en
+  paralelo para subproblemas independientes. `/fabrica` detecta océanos y
+  deriva automáticamente.
 - **`/razonar` + playbook de razonamiento profundo**: el método de
   razonamiento de Fable como artefacto ejecutable (descomposición por valor
   de información, evidencia en contra, pre-mortem, calibración

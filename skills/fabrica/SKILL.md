@@ -29,6 +29,10 @@ etapa está el trabajo, qué falta, y poner en marcha la skill correcta.
    resumido en español claro: objetivo, etapa, últimos pasos, pendientes.
 2. Si no hay sprint: pregunta el objetivo (formato RECOMENDACIÓN) y ejecuta
    `node <RAIZ>/nucleo/estado.mjs iniciar "<objetivo>"`.
+   **Detector de océanos:** si el objetivo cruza múltiples módulos, tiene
+   incógnitas técnicas reales o no cabe en un día de trabajo, NO lo metas al
+   ciclo normal: deriva a `/complejo` (cuaderno de razonamiento + árbol de
+   dependencias + ataque por incertidumbre).
 3. Recomienda el siguiente paso según la etapa:
 
 | Etapa actual | Siguiente skill | Cuándo saltarla |
