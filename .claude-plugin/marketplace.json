@@ -1,0 +1,13 @@
+{
+  "name": "repofibe-marketplace",
+  "owner": {
+    "name": "Brayan Sánchez"
+  },
+  "plugins": [
+    {
+      "name": "repofibe",
+      "source": "./",
+      "description": "La Fábrica: equipo de ingeniería virtual en español con guardias deterministas, estado de sprint y memoria persistente."
+    }
+  ]
+}
