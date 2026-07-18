@@ -112,6 +112,14 @@ const HOSTS = {
   claude: {
     detectar: () => existsSync(join(HOGAR, ".claude")),
     instalar(registro) {
+      // Si ya hay una instalación previa en modo copia, se refresca en ese
+      // mismo modo (no se intenta el plugin: duplicaría las skills).
+      const yaEnCopias = registro.rutas.some((r) => r.includes(join(".claude", "skills", "repofibe-")));
+      if (yaEnCopias) {
+        copiarSkills(registro, join(HOGAR, ".claude", "skills"));
+        console.log("  (refresco en modo copia — instalación previa detectada)");
+        return;
+      }
       // Camino preferido: plugin nativo (skills + hooks deterministas).
       try {
         ejecutar("claude", ["plugin", "marketplace", "add", RAIZ]);
