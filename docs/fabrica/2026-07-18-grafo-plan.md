@@ -83,19 +83,20 @@ contratos rotos tarde. **Descartada por B a bajo costo.**
 
 ## 6. Plan de ejecución (iteraciones del loop)
 
-- [ ] **F1 — `nucleo/grafo.mjs`**: `generar` (grafo de imports propio →
+- [x] **F1 — `nucleo/grafo.mjs`**: `generar` (grafo de imports propio →
       `.fabrica/grafo.json`), `impacto <archivo>` (dependientes inversos
       transitivos, profundidad ≤4), `deps <archivo>`, `hubs [n]`,
       `frescura`. Soporte de lectura para graph.json externo
-      (`--externo <ruta>`) con chequeo de manifest.
-- [ ] **F2 — skill `/grafo`**: cuándo usar qué consulta; cableado a
+      (`externo <ruta>`) con chequeo de manifest. *Verificado en vivo: la
+      frescura marcó el graphify-out de HYNTIBIA como NO CONFIABLE (136/136
+      archivos ya no existen) — el pre-mortem #1 ocurrió de verdad.*
+- [x] **F2 — skill `/grafo`**: cuándo usar qué consulta; cableado a
       `/revisar` (impacto antes del veredicto), `/ubicar` (paso 6:
       relaciones), `/plan-ing` (arquitectura real), `/complejo` (mapa del
       territorio).
-- [ ] **F3 — evals**: proyecto sintético con imports cruzados → `impacto`
-      devuelve el cierre transitivo correcto; frescura detecta un archivo
-      tocado.
-- [ ] **F4 — docs**: README, COMPARACION-GSTACK (otra ventaja sin
+- [x] **F3 — evals**: proyecto sintético con imports cruzados → `impacto`
+      devuelve el cierre transitivo correcto; frescura confiable tras generar.
+- [x] **F4 — docs**: README, COMPARACION-GSTACK (otra ventaja sin
       infraestructura: gstack necesita gbrain+embeddings para "code-refs";
       repofibe lo hace con un JSON local).
 
@@ -111,3 +112,21 @@ Supuestos declarados: *creo* que el regex de imports cubre la mayoría de los
 casos JS/TS/Python de tus proyectos; *sé* que el graph.json actual es casi
 un árbol y está stale; *supongo* que graphify se puede re-ejecutar desde
 donde el usuario la instaló.
+
+## 8. Actualización del modelo (2026-07-18, misma tarde)
+
+El usuario aportó la guía completa de graphify: es una herramienta viva
+(Apache 2.0, PyPI `graphifyy`, Python 3.10+), con AST tree-sitter de 25
+lenguajes, subagentes para relaciones semánticas con etiquetas de confianza
+(EXTRACTED/INFERRED/AMBIGUOUS), comunidades Leiden, `/graphify query|path|
+explain`, y — crucial — `graphify hook install` que reconstruye el grafo en
+cada commit, resolviendo el pre-mortem #1 (staleness) de raíz.
+
+**Decisión refinada:** la alternativa B evoluciona a una jerarquía de
+motores en `/grafo`: (1) graphify si está instalado y fresco — el motor
+rico; (2) `grafo.mjs` propio — fallback cero-deps que siempre funciona;
+(3) Grep — confirmación a nivel símbolo. El supuesto "no sabemos si la
+herramienta se puede re-ejecutar" quedó refutado: se puede
+(`py -m pip install graphifyy`, verificado Python 3.14 en la máquina).
+Lo construido no se tira: grafo.mjs es exactamente el fallback que la
+jerarquía necesita.

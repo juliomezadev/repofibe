@@ -73,6 +73,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/razonar` | **Razonamiento Fable** | El playbook profundo aplicado por escrito: descomposición por valor de información, alternativas con condición de arrepentimiento, pre-mortem, calibración sé/creo/supongo |
 | `/complejo` | **Problemas muy complejos** | Cuaderno de razonamiento persistente entre sesiones, árbol de dependencias, la mayor incertidumbre primero (spikes), integración continua, subagentes en paralelo |
 | `/ubicar` | **Sentido de orientación** | Localiza cualquier cosa en un repo sin leer de más: mapa estructural (`mapa.mjs`), hipótesis por convención, Grep dirigido, confirmación con `archivo:línea` |
+| `/grafo` | **Grafo de código** | ¿Qué se rompe si toco X? (impacto transitivo), hubs críticos, deps — consultas de 20 líneas sin leer archivos. Consume grafos externos (graphify/NetworkX) con chequeo de frescura obligatorio |
 | `/oficina` | **Socio de YC** | Seis preguntas forzadas que reencuadran el producto antes de escribir código. Produce el doc de diseño |
 | `/spec` | **Autor de specs** | Intención vaga → spec ejecutable en 5 fases, con gate de calidad 7/10 y redacción de secretos |
 | `/plan-ceo` | **CEO fundador** | Reta premisas, busca el producto de 10 estrellas. Modos: expansión / selectiva / mantener / reducción |

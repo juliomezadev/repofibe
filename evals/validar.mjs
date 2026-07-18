@@ -100,7 +100,20 @@ try {
   if (!/BotonLogin\.jsx/.test(r.stdout)) fallo(`mapa.mjs buscar no ubicó BotonLogin.jsx: ${r.stdout}`);
   r = correr("mapa.mjs", ["ver"]);
   if (!/package\.json/.test(r.stdout)) fallo(`mapa.mjs ver no marca package.json como clave: ${r.stdout}`);
-  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa"))) ok("estado, memoria (búsqueda sin tildes) y mapa (generar/buscar/ver) funcionan");
+
+  // grafo.mjs: cadena a.js → b.js → c.js; impacto de c.js debe ser b (prof 1) y a (prof 2).
+  execFileSync(process.execPath, ["-e",
+    "const{writeFileSync}=require('fs');const{join}=require('path');const b=process.argv[1];" +
+    "writeFileSync(join(b,'src','a.js'),\"import x from './b.js'\");" +
+    "writeFileSync(join(b,'src','b.js'),\"import y from './c.js'\");" +
+    "writeFileSync(join(b,'src','c.js'),'export default 1');", tmp]);
+  r = correr("grafo.mjs", ["generar"]);
+  if (!/2 dependencias internas/.test(r.stdout)) fallo(`grafo.mjs generar: esperaba 2 dependencias → ${r.stdout || r.stderr}`);
+  r = correr("grafo.mjs", ["impacto", "src/c.js"]);
+  if (!/prof 1:[\s\S]*src\/b\.js/.test(r.stdout) || !/prof 2:[\s\S]*src\/a\.js/.test(r.stdout)) fallo(`grafo.mjs impacto: cierre transitivo incorrecto → ${r.stdout}`);
+  r = correr("grafo.mjs", ["frescura"]);
+  if (!/confiable/.test(r.stdout)) fallo(`grafo.mjs frescura recién generado debía ser confiable: ${r.stdout}`);
+  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa") || f.startsWith("grafo"))) ok("estado, memoria, mapa y grafo (impacto transitivo + frescura) funcionan");
 } finally { /* tmp se limpia al final */ }
 
 // ── 6. Funcional: guardia.mjs (protocolo de hook real por stdin) ─────────────

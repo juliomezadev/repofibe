@@ -14,6 +14,18 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **Integración graphify**: `/grafo` usa una jerarquía de motores —
+  graphify si está instalado (AST 25 lenguajes, `/graphify query|path|
+  explain`, etiquetas EXTRACTED/INFERRED/AMBIGUOUS, hook de auto-rebuild
+  por commit) → `grafo.mjs` propio como fallback cero-deps → Grep como
+  última palabra a nivel símbolo.
+- **`/grafo` + `nucleo/grafo.mjs`**: el grafo de código. Responde "¿qué se
+  rompe si toco X?" (impacto transitivo prof ≤4), "¿de qué depende X?" y
+  "¿cuáles son los archivos críticos?" (hubs) en consultas de ~20 líneas,
+  sin leer archivos. Grafo propio de imports (JS/TS/Python, regex, <2s,
+  cero deps) + consumidor de graph.json externos (NetworkX/graphify) con
+  veredicto de frescura obligatorio — un grafo viejo se marca NO CONFIABLE
+  en vez de mentir.
 - **`/ubicar` + `nucleo/mapa.mjs`**: el sentido de orientación. El mapa
   estructural del proyecto (directorios, conteos por extensión, archivos
   clave ★) se genera en <1s sin leer contenidos; la skill encadena mapa →
