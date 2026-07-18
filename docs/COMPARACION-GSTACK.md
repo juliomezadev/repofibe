@@ -73,6 +73,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Evals tier 2 (E2E con sesión real) | ⏳ v0.2 | |
 | Evals tier 3 (LLM-juez) | ⏳ v0.3 | |
 | gbrain (base de conocimiento con embeddings) | 🔶 | memoria.mjs cubre recall básico; embeddings/búsqueda semántica ⏳ v0.4 |
+| Orientación en el repo (gbrain code-def/code-refs) | ✅ `/ubicar` + `mapa.mjs` | **Mejora sin infraestructura**: mapa estructural instantáneo (solo nombres, cero indexado pesado) + método de localización en cadena de hipótesis. gstack necesita una DB con embeddings para esto |
 | Sync de memoria entre máquinas (repo git privado) | ⏳ v0.4 | Con escáner de secretos antes de push |
 | Telemetría opt-in a Supabase | 🚫 | Decisión de privacidad: analítica local siempre, remota nunca por defecto |
 | Defensa anti prompt-injection (clasificador ML, canary) | ⏳ v0.2+ | El canary token y las reglas de contenido no confiable no requieren ML y entran antes |

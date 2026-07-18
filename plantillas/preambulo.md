@@ -24,6 +24,14 @@
    ```
    Si hay resultados relevantes, incorpóralos a tu contexto y menciónalos.
 
+4. **Oriéntate antes de buscar.** Si la tarea toca código de un proyecto y
+   necesitas localizar algo, usa el mapa (regla 11: lectura quirúrgica):
+   ```
+   node <RAIZ_REPOFIBE>/nucleo/mapa.mjs ver       # (genera con "generar" si no existe o cambió el commit)
+   node <RAIZ_REPOFIBE>/nucleo/mapa.mjs buscar <término>
+   ```
+   El método completo de localización está en la skill `ubicar`.
+
 4. **Al terminar la skill** (siempre, aunque termine a medias):
    ```
    node <RAIZ_REPOFIBE>/nucleo/estado.mjs registrar <nombre-skill> "<resultado en una línea>"

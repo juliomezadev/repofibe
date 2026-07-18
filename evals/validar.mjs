@@ -87,7 +87,20 @@ try {
   if (!/Memoria guardada/.test(r.stdout)) fallo(`memoria.mjs agregar: ${r.stdout || r.stderr}`);
   r = correr("memoria.mjs", ["buscar", "validacion"]); // sin tilde: prueba normalización de acentos
   if (!/validación funciona/.test(r.stdout)) fallo(`memoria.mjs buscar no encontró (¿normalización de acentos rota?): ${r.stdout}`);
-  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria"))) ok("estado.mjs y memoria.mjs funcionan (incluida búsqueda sin tildes)");
+
+  // mapa.mjs: estructura de prueba → generar → buscar por nombre.
+  execFileSync(process.execPath, ["-e",
+    "const{mkdirSync,writeFileSync}=require('fs');const{join}=require('path');const b=process.argv[1];" +
+    "mkdirSync(join(b,'src','componentes'),{recursive:true});" +
+    "writeFileSync(join(b,'src','componentes','BotonLogin.jsx'),'x');" +
+    "writeFileSync(join(b,'package.json'),'{}');", tmp]);
+  r = correr("mapa.mjs", ["generar"]);
+  if (!/Mapa generado/.test(r.stdout)) fallo(`mapa.mjs generar: ${r.stdout || r.stderr}`);
+  r = correr("mapa.mjs", ["buscar", "login"]);
+  if (!/BotonLogin\.jsx/.test(r.stdout)) fallo(`mapa.mjs buscar no ubicó BotonLogin.jsx: ${r.stdout}`);
+  r = correr("mapa.mjs", ["ver"]);
+  if (!/package\.json/.test(r.stdout)) fallo(`mapa.mjs ver no marca package.json como clave: ${r.stdout}`);
+  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa"))) ok("estado, memoria (búsqueda sin tildes) y mapa (generar/buscar/ver) funcionan");
 } finally { /* tmp se limpia al final */ }
 
 // ── 6. Funcional: guardia.mjs (protocolo de hook real por stdin) ─────────────

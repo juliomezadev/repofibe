@@ -14,6 +14,12 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/ubicar` + `nucleo/mapa.mjs`**: el sentido de orientación. El mapa
+  estructural del proyecto (directorios, conteos por extensión, archivos
+  clave ★) se genera en <1s sin leer contenidos; la skill encadena mapa →
+  hipótesis por nombre → hipótesis por convención → Grep dirigido →
+  confirmación, y responde con `archivo:línea` distinguiendo definición,
+  usos y configuración. El preámbulo lo activa en toda skill que toque código.
 - **`/diseno`**: consultoría de diseño y frontend que razona — entrevista
   con anti-adjetivo, recuperación quirúrgica del catálogo awesome-design-md
   (3-5 referentes por sector, jamás las ~75 fichas), sistema derivado del
