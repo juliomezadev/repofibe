@@ -32,13 +32,13 @@ dependencias npm, cero binarios compilados.
 
 ```powershell
 # Windows
-git clone https://github.com/brayansanchez/repofibe.git
+git clone https://github.com/juliomezasena-byte/repofibe.git
 cd repofibe; .\instalar.ps1
 ```
 
 ```bash
 # macOS / Linux / WSL
-git clone https://github.com/brayansanchez/repofibe.git
+git clone https://github.com/juliomezasena-byte/repofibe.git
 cd repofibe && ./instalar.sh
 ```
 
