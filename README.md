@@ -48,7 +48,10 @@ generar los lanzadores `/repofibe-*` en un workspace de Antigravity:
 `--host antigravity --workspace <ruta-del-proyecto>`. Para cualquier otro
 IDE: `--host generico --workspace <ruta>` (skills + bloque en AGENTS.md).
 
-- **Actualizar:** `git pull` y volver a ejecutar el instalador.
+- **Actualizar:** automático — al abrir sesión (máx. 1 vez/hora) repofibe
+  detecta versión nueva, hace `git pull --ff-only` y refresca las skills en
+  todos los hosts instalados. Manual: `git pull` + instalador. Apagar el
+  automático: `~/.repofibe/config.json` → `{"auto_actualizar": false}`.
 - **Desinstalar:** `instalar.ps1 -Quitar` / `./instalar.sh --quitar` — limpia
   todo lo que instaló (lo registra en `~/.repofibe/instalado.json`).
 

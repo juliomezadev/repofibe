@@ -77,7 +77,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Telemetría opt-in a Supabase | 🚫 | Decisión de privacidad: analítica local siempre, remota nunca por defecto |
 | Defensa anti prompt-injection (clasificador ML, canary) | ⏳ v0.2+ | El canary token y las reglas de contenido no confiable no requieren ML y entran antes |
 | iOS QA en dispositivo real | 🚫 | Exige Mac; contradice Windows-first |
-| Auto-update check por sesión | ✅ en `sesion.mjs` | Throttled 1/hora, tolerante a red caída, solo clones git, timeout 4s |
+| Auto-update check por sesión | ✅ en `sesion.mjs` | **Mejora**: gstack solo avisa; repofibe se actualiza solo (`git pull --ff-only` + refresco de skills a todos los destinos instalados). Throttled 1/hora, ff-only (jamás pisa cambios locales), opt-out con `auto_actualizar: false` |
 
 ## Ventajas de repofibe que gstack no tiene
 

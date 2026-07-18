@@ -46,6 +46,7 @@ const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? (args[i + 1] ??
 const hostPedido = flag("--host");
 const workspace = flag("--workspace");
 const quitar = args.includes("--quitar");
+const refrescar = args.includes("--refrescar");
 
 function skills() {
   return readdirSync(join(RAIZ, "skills"), { withFileTypes: true })
@@ -179,6 +180,26 @@ const HOSTS = {
 };
 
 // ── principal ────────────────────────────────────────────────────────────────
+if (refrescar) {
+  // Re-copia TODO a los destinos ya usados (según el registro), incluyendo
+  // skills nuevas que no existían al instalar. Lo usa la auto-actualización.
+  const registro = leerRegistro();
+  const bases = [...new Set(
+    registro.rutas
+      .filter((r) => r !== APP && /repofibe-[a-z-]+$/.test(r))
+      .map((r) => dirname(r))
+  )];
+  if (!bases.length && !registro.rutas.includes(APP)) {
+    console.log("Nada que refrescar: no hay instalación previa registrada.");
+    process.exit(0);
+  }
+  instalarApp(registro);
+  for (const b of bases) copiarSkills(registro, b);
+  guardarRegistro(registro);
+  console.log(`Refresco completo en ${bases.length} destino(s).`);
+  process.exit(0);
+}
+
 if (quitar) {
   const registro = leerRegistro();
   for (const ruta of registro.rutas) {

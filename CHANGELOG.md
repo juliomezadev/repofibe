@@ -14,6 +14,10 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **Auto-actualización real**: al detectar versión nueva, la sesión hace
+  `git pull --ff-only` y refresca las skills en todos los destinos
+  instalados (`instalar.mjs --refrescar`) — quien tenga repofibe se
+  actualiza solo. Publicado en GitHub con CI de evals (ubuntu + windows).
 - **`/complejo`**: problemas muy complejos (multi-día, multi-módulo, alta
   incertidumbre) con el método Fable completo: cuaderno de razonamiento
   persistente en `.fabrica/problemas/`, árbol de dependencias, ataque por

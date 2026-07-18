@@ -21,14 +21,26 @@ function chequearActualizacion() {
     if (existsSync(sello) && Date.now() - statSync(sello).mtimeMs < 3600_000) return null;
     mkdirSync(dirname(sello), { recursive: true });
     writeFileSync(sello, new Date().toISOString());
-    const git = (args) => execFileSync("git", ["-C", raiz, ...args], { encoding: "utf8", timeout: 4000, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const git = (args, ms = 4000) => execFileSync("git", ["-C", raiz, ...args], { encoding: "utf8", timeout: ms, stdio: ["ignore", "pipe", "ignore"] }).trim();
     git(["fetch", "--quiet"]);
     const local = git(["rev-parse", "HEAD"]);
     const remoto = git(["rev-parse", "@{u}"]);
-    if (local !== remoto && git(["merge-base", "HEAD", "@{u}"]) === local) {
-      return `[repofibe] Hay una actualización disponible: ejecuta "git -C ${raiz} pull" y reinstala (instalar.ps1 / instalar.sh).`;
+    if (local === remoto || git(["merge-base", "HEAD", "@{u}"]) !== local) return null;
+
+    // Hay versión nueva y es fast-forward limpio. Auto-actualizar es el
+    // default ("que lo actualice de una"); se apaga con
+    // ~/.repofibe/config.json → {"auto_actualizar": false}.
+    let auto = true;
+    try { auto = JSON.parse(readFileSync(join(homedir(), ".repofibe", "config.json"), "utf8")).auto_actualizar !== false; } catch {}
+    if (auto) {
+      try {
+        git(["pull", "--ff-only", "--quiet"], 15000);
+        execFileSync(process.execPath, [join(raiz, "nucleo", "instalar.mjs"), "--refrescar"], { timeout: 15000, stdio: "ignore" });
+        const v = readFileSync(join(raiz, "VERSION"), "utf8").trim();
+        return `[repofibe] Auto-actualizado a la versión ${v} (git pull + refresco de skills). Cambios: ver CHANGELOG.md.`;
+      } catch { /* si falla, cae al aviso manual */ }
     }
-    return null;
+    return `[repofibe] Hay una actualización disponible: ejecuta "git -C ${raiz} pull" y reinstala (instalar.ps1 / instalar.sh).`;
   } catch { return null; }
 }
 
