@@ -207,7 +207,7 @@ rmSync(tmp, { recursive: true, force: true });
 // Viven aparte porque tienen su propio arnés (assert de Node, hogares
 // temporales); se agregan aquí para que ningún push quede en verde con una
 // de estas en rojo — el punto ciego que motivó esta integración.
-for (const suite of ["inteligencia/validar.mjs", "legal/validar.mjs", "seguridad/instalacion-segura.mjs", "seguridad/instalacion-hosts.mjs", "nucleo/salud.mjs", "nucleo/secretos.mjs", "nucleo/navegador.mjs", "nucleo/no-confiable.mjs", "nucleo/dominio.mjs", "nucleo/benchmark.mjs"]) {
+for (const suite of ["inteligencia/validar.mjs", "legal/validar.mjs", "seguridad/instalacion-segura.mjs", "seguridad/instalacion-hosts.mjs", "nucleo/salud.mjs", "nucleo/secretos.mjs", "nucleo/navegador.mjs", "nucleo/no-confiable.mjs", "nucleo/dominio.mjs", "nucleo/benchmark.mjs", "nucleo/cookies.mjs"]) {
   const ruta = join(RAIZ, "evals", suite);
   if (!existsSync(ruta)) continue;
   const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: 30000 });

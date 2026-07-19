@@ -4,6 +4,24 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`cookies.mjs`**: contexto autenticado para navegador.mjs, sin leer el
+  almacén cifrado del navegador real (sin SQLite, sin DPAPI, sin riesgos
+  dual-use). Usa Playwright's `storageState`: el usuario autentica UNA vez
+  en Chromium visible (`cookies.mjs guardar <dominio>`), el storageState se
+  guarda en `.fabrica/auth/<dominio>.json`, y la nueva acción `perfil` en
+  `navegador.mjs` lo inyecta en las sesiones siguientes. Cross-platform,
+  solo el dominio que el usuario pide (no todas sus cookies), cero deps
+  extra. Spike real con Chromium confirmó que: (1) addCookies con expiry
+  persiste entre sesiones, (2) launchPersistentContext preserva el perfil,
+  (3) storageState exportar/importar funciona entre contextos limpios. La
+  eval funcional encontró un bug real en normalizarDominio (no quitaba el
+  path completo, solo `/` al final) y lo corrigió. Integración E2E con
+  Chromium real + servidor HTTP local verificada: la cookie inyectada por
+  `perfil` aparece en el snapshot de la página servida.
+- **navegador.mjs**: nueva acción `perfil{dominio}` — carga storageState
+  antes de crear el contexto de página, para que las cookies y localStorage
+  del dominio estén disponibles desde la primera navegación.
+
 - **`/benchmark` + `nucleo/benchmark.mjs`**: Core Web Vitals reales (LCP,
   CLS, TTFB) sobre Chromium real, no estimados desde el código — inyecta
   un `PerformanceObserver` antes de navegar (`addInitScript`, el mismo

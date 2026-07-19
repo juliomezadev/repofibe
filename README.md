@@ -130,7 +130,7 @@ atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
 ## Hoja de ruta
 
 - **v0.4** — `/design-shotgun` (variantes + tablero + taste memory),
-  import de cookies del navegador real, evals tier 3 (LLM-juez).
+  evals tier 3 (LLM-juez).
 - **v0.5** — memoria compartida entre máquinas, `/pair-agent`,
   embeddings/búsqueda semántica.
 

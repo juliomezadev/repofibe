@@ -22,12 +22,15 @@
 //   node navegador.mjs ejecutar --archivo <script.json>
 //   node navegador.mjs ejecutar --stdin
 //
-// Acciones soportadas: navegar{url}, snapshot{}, click{ref}, escribir{ref,texto},
-// texto{ref} (lee el texto visible), screenshot{archivo}, esperar{ms}.
+// Acciones soportadas: perfil{dominio} (carga cookies guardadas), navegar{url}, snapshot{},
+// click{ref}, escribir{ref,texto}, texto{ref} (lee el texto visible),
+// screenshot{archivo}, esperar{ms}.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { join } from "node:path";
 import { detectarInyeccion } from "./no-confiable.mjs";
+import { cargar as cargarAuth, dirAuth as dirAuthBase } from "./cookies.mjs";
 
 async function cargarPlaywright() {
   try {
@@ -81,10 +84,21 @@ async function localizador(page, refs, ref) {
   return page.getByRole(info.role, { name: info.name, exact: true }).nth(info.indice);
 }
 
-export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000 } = {}) {
+export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
   const { chromium } = await cargarPlaywright();
   const browser = await chromium.launch({ headless });
-  const page = await browser.newPage();
+  let ctxOpts = {};
+  // Si el script comienza con "perfil", carga storageState antes de crear el contexto
+  const perfilAccion = acciones.find((a) => a.accion === "perfil");
+  if (perfilAccion) {
+    const state = cargarAuth(perfilAccion.dominio, dirBase);
+    if (state) {
+      ctxOpts = { storageState: state };
+    } else {
+      throw new Error(`No hay storageState para ${perfilAccion.dominio} — ejecuta: node <RAIZ>/nucleo/cookies.mjs guardar ${perfilAccion.dominio}`);
+    }
+  }
+  const page = await browser.newPage(ctxOpts);
   page.setDefaultTimeout(timeoutMs);
   let refs = {};
   const resultados = [];
@@ -93,6 +107,13 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
       const inicio = Date.now();
       try {
         switch (accion.accion) {
+          case "perfil": {
+            // Ya cargado en browser.newPage() — solo registrar el resultado
+            const state = cargarAuth(accion.dominio, dirBase);
+            const cookieCount = state ? state.cookies.filter((c) => c.domain.includes(accion.dominio)).length : 0;
+            resultados.push({ accion: "perfil", ok: true, dominio: accion.dominio, cookies: cookieCount, tiempoMs: 0 });
+            break;
+          }
           case "navegar": {
             await page.goto(accion.url, { waitUntil: "domcontentloaded" });
             resultados.push({ accion: "navegar", ok: true, url: page.url(), tiempoMs: Date.now() - inicio });
