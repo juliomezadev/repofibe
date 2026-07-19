@@ -14,6 +14,20 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **Fix (router de inteligencia)**: los patrones de intención no manejaban
+  plurales (`\bvulnerabilidad\b` no matcheaba "vulnerabilidades"), causando
+  que tareas de seguridad se enrutaran como revisión genérica. Corregido con
+  cobertura de la propia eval que lo detectó (`evals/inteligencia/validar.mjs`).
+- **Fix (seguridad del instalador)**: la auto-actualización era opt-out por
+  descuido (`!== false` en vez de `=== true`) y calculaba la raíz del repo
+  por aritmética de rutas en vez de `git rev-parse --show-toplevel` —
+  ambos corregidos. También se corrigió una asimetría en `instalar.mjs`
+  que dejaba una línea en blanco huérfana al desinstalar un bloque de
+  reglas. Cubierto por `evals/seguridad/instalacion-segura.mjs`.
+- **Evals unificadas**: las suites `inteligencia/`, `legal/` y
+  `seguridad/instalacion-segura.mjs` (antes sueltas y no ejecutadas por CI)
+  ahora corren dentro de `evals/validar.mjs` — ningún push puede quedar en
+  verde con una de ellas en rojo.
 - **`/canario`**: monitoreo post-deploy con línea base tomada por
   `/desplegar` — sondea disponibilidad, latencia y contenido durante una
   ventana configurable y reporta regresiones con evidencia. Rollback

@@ -160,6 +160,18 @@ if (!fallos.some((f) => f.startsWith("guardia"))) ok("guardia.mjs: destructivos�
 
 rmSync(tmp, { recursive: true, force: true });
 
+// ── 7. Suites independientes (inteligencia, legal, seguridad de instalación) ─
+// Viven aparte porque tienen su propio arnés (assert de Node, hogares
+// temporales); se agregan aquí para que ningún push quede en verde con una
+// de estas en rojo — el punto ciego que motivó esta integración.
+for (const suite of ["inteligencia/validar.mjs", "legal/validar.mjs", "seguridad/instalacion-segura.mjs"]) {
+  const ruta = join(RAIZ, "evals", suite);
+  if (!existsSync(ruta)) continue;
+  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: 30000 });
+  if (r.status !== 0) fallo(`evals/${suite}: ${(r.stderr || r.stdout).trim().split("\n").slice(0, 4).join(" | ")}`);
+  else ok(`evals/${suite}: ${r.stdout.trim().split("\n").at(-1)}`);
+}
+
 // ── veredicto ────────────────────────────────────────────────────────────────
 if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);

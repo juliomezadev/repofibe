@@ -13,25 +13,34 @@ import { execFileSync } from "node:child_process";
 // Chequeo de actualización: throttled a 1/hora, tolerante a fallos de red,
 // silencioso salvo que de verdad haya versión nueva. Solo aplica si la raíz
 // de repofibe es un clon git (instalaciones por copia no se auto-chequean).
+//
+// Auto-pull es OPT-IN ESTRICTO: por defecto solo avisa. Se activa con
+// ~/.repofibe/config.json → {"auto_actualizar": true}. Escribir en el
+// working tree del usuario sin que lo haya pedido explícitamente no es un
+// default aceptable — "que se actualice de una" es una decisión del
+// usuario, no del instalador.
 function chequearActualizacion() {
   try {
-    const raiz = dirname(dirname(fileURLToPath(import.meta.url)));
-    if (!existsSync(join(raiz, ".git"))) return null;
+    const candidata = dirname(dirname(fileURLToPath(import.meta.url)));
+    if (!existsSync(join(candidata, ".git"))) return null;
+    const git = (args, ms = 4000) => execFileSync("git", ["-C", candidata, ...args], { encoding: "utf8", timeout: ms, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    // La raíz real la da git, no aritmética de rutas — así una skill copiada
+    // dentro de un repo ajeno nunca hereda ese repo como si fuera repofibe.
+    const raiz = git(["rev-parse", "--show-toplevel"]);
+    if (!existsSync(join(raiz, "nucleo", "instalar.mjs"))) return null;
+
     const sello = join(homedir(), ".repofibe", "ultima-verificacion");
     if (existsSync(sello) && Date.now() - statSync(sello).mtimeMs < 3600_000) return null;
     mkdirSync(dirname(sello), { recursive: true });
     writeFileSync(sello, new Date().toISOString());
-    const git = (args, ms = 4000) => execFileSync("git", ["-C", raiz, ...args], { encoding: "utf8", timeout: ms, stdio: ["ignore", "pipe", "ignore"] }).trim();
+
     git(["fetch", "--quiet"]);
     const local = git(["rev-parse", "HEAD"]);
     const remoto = git(["rev-parse", "@{u}"]);
     if (local === remoto || git(["merge-base", "HEAD", "@{u}"]) !== local) return null;
 
-    // Hay versión nueva y es fast-forward limpio. Auto-actualizar es el
-    // default ("que lo actualice de una"); se apaga con
-    // ~/.repofibe/config.json → {"auto_actualizar": false}.
     let auto = false;
-    try { auto = JSON.parse(readFileSync(join(homedir(), ".repofibe", "config.json"), "utf8")).auto_actualizar !== false; } catch {}
+    try { auto = JSON.parse(readFileSync(join(homedir(), ".repofibe", "config.json"), "utf8")).auto_actualizar === true; } catch {}
     if (auto) {
       try {
         const sucio = git(["status", "--porcelain"]); if (sucio) throw new Error("dirty");
@@ -39,9 +48,9 @@ function chequearActualizacion() {
         execFileSync(process.execPath, [join(raiz, "nucleo", "instalar.mjs"), "--refrescar"], { timeout: 15000, stdio: "ignore" });
         const v = readFileSync(join(raiz, "VERSION"), "utf8").trim();
         return `[repofibe] Auto-actualizado a la versión ${v} (git pull + refresco de skills). Cambios: ver CHANGELOG.md.`;
-      } catch { /* si falla, cae al aviso manual */ }
+      } catch { /* si falla (árbol sucio, red, etc.) cae al aviso manual */ }
     }
-    return `[repofibe] Hay una actualización disponible: ejecuta "git -C ${raiz} pull" y reinstala (instalar.ps1 / instalar.sh).`;
+    return `[repofibe] Hay una actualización disponible: ejecuta "git -C ${raiz} pull" y reinstala, o activa auto_actualizar:true en ~/.repofibe/config.json.`;
   } catch { return null; }
 }
 

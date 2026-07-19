@@ -4,15 +4,15 @@ const quitarAcentos = (valor) => String(valor ?? "").toLowerCase().normalize("NF
 const INTENCIONES = new Set(["producto", "construccion", "debug", "revision", "qa", "seguridad", "legal", "release", "documentacion", "general"]);
 
 const REGLAS = [
-  { intencion: "seguridad", especialista: "seguridad", patrones: [/\b(seguridad|vulnerabilidad|secreto|credencial|prompt\s+injection|amenaza)\b/] },
-  { intencion: "legal", especialista: "legal", patrones: [/\b(legal|privacidad|datos?\s+personales?|ley|cumplimiento|contrato)\b/] },
+  { intencion: "seguridad", especialista: "seguridad", patrones: [/\b(seguridad|vulnerabilidad\w*|secretos?|credenciales?|prompt\s+injection|amenazas?)\b/] },
+  { intencion: "legal", especialista: "legal", patrones: [/\b(legal|privacidad|datos?\s+personales?|leyes?|cumplimiento|contratos?)\b/] },
   { intencion: "release", especialista: "shipear", patrones: [/\b(deploy|publicar|release|ship|produccion|versionar)\b/] },
-  { intencion: "qa", especialista: "qa", patrones: [/\b(qa|test|prueba|calidad|accesibilidad|e2e|regresion)\b/] },
-  { intencion: "debug", especialista: "investigar", patrones: [/\b(bug|error|falla|fallo|no\s+funciona|debug|corregir|arreglar)\b/] },
-  { intencion: "revision", especialista: "revisar", patrones: [/\b(revisar|revision|review|auditar|audit|feedback)\b/] },
-  { intencion: "documentacion", especialista: "docs", patrones: [/\b(documentar|documentacion|readme|manual|guia)\b/] },
-  { intencion: "construccion", especialista: "construir", patrones: [/\b(implementar|construir|crear|modificar|refactorizar|codigo|feature)\b/] },
-  { intencion: "producto", especialista: "plan-ceo", patrones: [/\b(plan|producto|usuario|alcance|prioridad|roadmap)\b/] },
+  { intencion: "qa", especialista: "qa", patrones: [/\b(qa|tests?|pruebas?|calidad|accesibilidad|e2e|regresi(?:on|ones))\b/] },
+  { intencion: "debug", especialista: "investigar", patrones: [/\b(bugs?|errores?|fallas?|fallos?|no\s+funciona|debug|corregir|arreglar)\b/] },
+  { intencion: "revision", especialista: "revisar", patrones: [/\b(revisar|revisi(?:on|ones)|review|auditar|audit|feedback)\b/] },
+  { intencion: "documentacion", especialista: "docs", patrones: [/\b(documentar|documentaci(?:on|ones)|readme|manual(?:es)?|guias?)\b/] },
+  { intencion: "construccion", especialista: "construir", patrones: [/\b(implementar|construir|crear|modificar|refactorizar|codigo|features?)\b/] },
+  { intencion: "producto", especialista: "plan-ceo", patrones: [/\b(planes?|producto|usuarios?|alcance|prioridad(?:es)?|roadmap)\b/] },
 ];
 
 function contextoDe(tarea) {

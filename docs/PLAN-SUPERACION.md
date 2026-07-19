@@ -18,19 +18,44 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
 
 ## Orden de ejecución
 
-1. Seguridad del actualizador y del instalador: opt-in, ownership por archivo,
-   rollback y pruebas de desinstalación sin pérdida de datos.
-2. Núcleo confiable: guardias, estado, grafo con hashes de contenido y manejo
-   explícito de confianza.
-3. Orquestador: tarea, plan, riesgo, modo, evidencia y transiciones de estado
-   como contratos estructurados.
-4. Memoria y orientación: recuperación relevante, impacto transitivo y
-   selección de pruebas afectadas.
-5. Legal colombiano: fuentes oficiales, vigencia, fecha de consulta,
-   incertidumbre y escalamiento a abogado.
-6. Adaptadores multi-host con pruebas de instalación, ejecución, actualización
-   y desinstalación por host.
-7. Navegador, deploy, canary y benchmark, después de estabilizar el núcleo.
+1. ✅ Seguridad del actualizador y del instalador: opt-in ESTRICTO
+   (`auto_actualizar === true`, antes era opt-out por descuido — corregido),
+   ownership por archivo (sha256), raíz real vía `git rev-parse
+   --show-toplevel` (antes aritmética de rutas, vulnerable a copias), y
+   pruebas de desinstalación sin pérdida de datos. `evals/seguridad/
+   instalacion-segura.mjs`, integrado a la suite principal.
+2. ✅ Núcleo confiable: guardias (`guardia.mjs`), estado (`estado.mjs`),
+   grafo con hashes de contenido (`grafo.mjs`, frescura por commit) y manejo
+   explícito de confianza (EXTRACTED/INFERRED/AMBIGUOUS en grafos externos).
+3. ✅ Orquestador: `nucleo/inteligencia/` — tarea, plan, riesgo, modo,
+   evidencia y transiciones de estado como contratos estructurados
+   (`contratos.mjs`, `riesgo.mjs`, `modos.mjs`, `router.mjs`,
+   `evidencia.mjs`), con CLI demostrable (`orquestador.mjs`) y 10 pruebas
+   en `evals/inteligencia/validar.mjs`. El router tenía un bug real de
+   coincidencia de plurales (regex singular con `\b` final no matcheaba
+   "vulnerabilidades"/"secretos") — corregido y cubierto por el mismo test
+   que lo detectó.
+4. 🔶 Memoria y orientación: recuperación relevante (`memoria.mjs buscar`) e
+   impacto transitivo (`grafo.mjs impacto`) ya existen; falta selección
+   automática de pruebas afectadas por un cambio — **siguiente en la cola**.
+5. ✅ Legal colombiano: fuentes oficiales allowlisted, vigencia, fecha de
+   consulta, incertidumbre calibrada y escalamiento a abogado. Contrato de
+   respuesta obligatorio verificado en `evals/legal/validar.mjs`.
+6. 🔶 Adaptadores multi-host: instalación/actualización/desinstalación
+   probadas para el host genérico (`.agent/skills` + `AGENTS.md`); faltan
+   pruebas equivalentes para Claude Code (plugin nativo) y Antigravity.
+7. 🔶 Navegador, deploy, canary y benchmark: `/desplegar` y `/canario` ya
+   existen como skills GUIADAS (instrucción para el modelo, sin código
+   ejecutable propio); navegador y benchmark siguen PLANEADOS. Ninguno de
+   estos entra en la categoría IMPLEMENTADA todavía — ver nota de
+   calibración abajo.
+
+**Nota de calibración (2026-07-18):** varias filas de `COMPARACION-GSTACK.md`
+marcadas ✅ corresponden a skills en Markdown (categoría GUIADA de este
+documento), no a código con test automatizado (IMPLEMENTADA). La distinción
+importa: una skill GUIADA depende de que el modelo la siga bien en cada
+sesión; una IMPLEMENTADA se comporta igual siempre. Los seis módulos con ✅
+en este documento sí tienen evals que los ejecutan de verdad.
 
 ## Modos de operación
 

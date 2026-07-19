@@ -380,7 +380,12 @@ function quitarBloquePropio(propiedad) {
   let despues = texto.slice(actual.fin);
   if (despues.startsWith("\r\n")) despues = despues.slice(2);
   else if (despues.startsWith("\n")) despues = despues.slice(1);
-  const nuevo = texto.slice(0, actual.inicio) + despues;
+  // ponerBloque separa el contenido previo del bloque con "\n\n" (vía
+  // trimEnd + separador); deshacer eso exactamente para no dejar una línea
+  // en blanco huérfana que ponerBloque nunca puso ahí a propósito.
+  let antes = texto.slice(0, actual.inicio).replace(/\r?\n+$/, "");
+  if (antes) antes += texto.includes("\r\n") ? "\r\n" : "\n";
+  const nuevo = antes + despues;
   if (propiedad.creado && nuevo.trim() === "") {
     if (!dryRun) unlinkSync(ruta); else console.log("[DRY-RUN] unlink", ruta);
   } else {
