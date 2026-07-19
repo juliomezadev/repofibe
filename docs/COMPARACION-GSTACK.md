@@ -86,6 +86,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | gbrain (base de conocimiento con embeddings) | 🔶 | `[IMPLEMENTADA]` recall básico (`memoria.mjs`); embeddings/búsqueda semántica ⏳ v0.4 |
 | Orientación en el repo (gbrain code-def/code-refs) | ✅ `/ubicar` + `mapa.mjs` | `[IMPLEMENTADA]` el núcleo (`mapa.mjs generar/buscar/ver`) tiene eval funcional; el método de búsqueda en cadena de hipótesis de la skill es `[GUIADA]`. gstack necesita una DB con embeddings para esto |
 | Grafo de dependencias / análisis de impacto | ✅ `/grafo` + `grafo.mjs` | `[IMPLEMENTADA]` el núcleo (`grafo.mjs impacto/deps/hubs/frescura`) tiene eval de cierre transitivo; la skill que decide cuándo usar graphify vs el propio es `[GUIADA]`. gstack no tiene nada equivalente |
+| Selección de tests afectados por un cambio | ✅ `/pruebas-afectadas` + `pruebas.mjs` | `[IMPLEMENTADA]` cruza `git diff` (staged+unstaged+untracked, o un rango) con `impactoTransitivo` de `grafo.mjs`; reporta pruebas en el radio Y archivos cambiados sin ningún test que los alcance. gstack no lo tiene |
 | Sync de memoria entre máquinas (repo git privado) | ⏳ v0.4 | Con escáner de secretos antes de push |
 | Telemetría opt-in a Supabase | 🚫 | Decisión de privacidad: analítica local siempre, remota nunca por defecto |
 | Defensa anti prompt-injection (clasificador ML, canary) | ⏳ v0.2+ | El canary token y las reglas de contenido no confiable no requieren ML y entran antes |

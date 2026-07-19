@@ -132,6 +132,21 @@ try {
     fallo(`checkpoint.mjs aplanar dejó historia incorrecta: ${titulos.join(" | ")}`);
   }
   if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa") || f.startsWith("grafo") || f.startsWith("checkpoint"))) ok("estado, memoria, mapa, grafo y checkpoint (WIP→aplanar sin tocar commits normales) funcionan");
+
+  // pruebas.mjs: agrega src/a.test.js (importa a.js) sobre la cadena a→b→c ya
+  // committeada, modifica c.js sin commitear, y confirma que a.test.js aparece
+  // como afectado. Esto fija en rojo el bug real de 2026-07-19: git() devuelve
+  // un string y "[...s1, ...s2]" hacía spread carácter por carácter en vez de
+  // por línea — "Cambiados: 16" con letras sueltas en vez de rutas.
+  execFileSync(process.execPath, ["-e",
+    "require('fs').writeFileSync(require('path').join(process.argv[1],'src','a.test.js'),\"import a from './a.js'\")", tmp]);
+  execFileSync(process.execPath, ["-e",
+    "require('fs').appendFileSync(require('path').join(process.argv[1],'src','c.js'),'\\n// tocado')", tmp]);
+  correr("grafo.mjs", ["generar"]);
+  r = correr("pruebas.mjs", ["afectadas"]);
+  if (!/src\/a\.test\.js/.test(r.stdout)) fallo(`pruebas.mjs afectadas no detectó a.test.js como afectado por el cambio en c.js → ${r.stdout || r.stderr}`);
+  if (/^\s*[a-z]\s*$/m.test(r.stdout)) fallo(`pruebas.mjs afectadas: regresión del bug de spread por carácter → ${r.stdout}`);
+  if (!fallos.some((f) => f.startsWith("pruebas.mjs"))) ok("pruebas.mjs afectadas: cierre transitivo hasta el test correcto (a.test.js) tras cambiar c.js");
 } finally { /* tmp se limpia al final */ }
 
 // ── 6. Funcional: guardia.mjs (protocolo de hook real por stdin) ─────────────

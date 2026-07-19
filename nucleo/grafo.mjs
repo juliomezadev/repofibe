@@ -19,13 +19,14 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync, existsSync, statSync } from "node:fs";
 import { join, dirname, relative, extname } from "node:path";
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const RAIZ = process.cwd();
 const ARCHIVO = join(RAIZ, ".fabrica", "grafo.json");
 const IGNORAR = new Set(["node_modules", ".git", "dist", "build", "out", ".next", "coverage", ".fabrica", "__pycache__", ".venv", "venv", "target", "vendor", ".cache"]);
 const EXTS = new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"]);
 
-const norm = (p) => p.split("\\").join("/");
+export const norm = (p) => p.split("\\").join("/");
 
 function archivosCodigo(dir, base, salida) {
   let entradas;
@@ -100,23 +101,43 @@ function generar() {
   return grafo;
 }
 
-function cargar() {
+export function cargar() {
   try { return JSON.parse(readFileSync(ARCHIVO, "utf8")); } catch { return null; }
 }
 
-function cargarOGenerar() {
+export function cargarOGenerar() {
   const g = cargar();
   if (g) return g;
   console.log("(sin grafo previo — generando)");
   return generar();
 }
 
-function inverso(aristas) {
+export function inverso(aristas) {
   const inv = {};
   for (const [de, deps] of Object.entries(aristas)) for (const d of deps) (inv[d] ??= []).push(de);
   return inv;
 }
 
+// BFS inverso reutilizable: quién depende de `archivo`, transitivo, hasta profMax.
+// Devuelve { visitado, niveles } — visitado incluye `archivo` mismo.
+export function impactoTransitivo(aristas, archivo, profMax = 4) {
+  const inv = inverso(aristas);
+  const visitado = new Set([archivo]);
+  let frontera = [archivo];
+  const niveles = [];
+  for (let prof = 1; prof <= profMax && frontera.length; prof++) {
+    const siguiente = [];
+    for (const f of frontera) for (const dep of inv[f] ?? []) if (!visitado.has(dep)) { visitado.add(dep); siguiente.push(dep); }
+    if (siguiente.length) niveles.push({ prof, archivos: siguiente });
+    frontera = siguiente;
+  }
+  return { visitado, niveles };
+}
+
+// Guard: este bloque solo corre cuando grafo.mjs se invoca como CLI, no
+// cuando otro módulo (p.ej. pruebas.mjs) hace `import ... from "./grafo.mjs"`
+// — si no, la importación disparaba el switch con los argv del importador.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
 const [cmd, ...args] = process.argv.slice(2);
 
 switch (cmd) {
@@ -136,14 +157,7 @@ switch (cmd) {
   case "impacto": {
     const g = cargarOGenerar();
     const a = norm(args[0] ?? "");
-    const inv = inverso(g.aristas);
-    const visitado = new Set([a]); let frontera = [a]; const niveles = [];
-    for (let prof = 1; prof <= 4 && frontera.length; prof++) {
-      const siguiente = [];
-      for (const f of frontera) for (const dep of inv[f] ?? []) if (!visitado.has(dep)) { visitado.add(dep); siguiente.push(dep); }
-      if (siguiente.length) niveles.push({ prof, archivos: siguiente });
-      frontera = siguiente;
-    }
+    const { visitado, niveles } = impactoTransitivo(g.aristas, a);
     if (!niveles.length) { console.log(`${a}: nadie depende de él (hoja) — impacto local. Verifica igual con Grep si es API pública.`); break; }
     console.log(`IMPACTO de tocar ${a} (${visitado.size - 1} archivos):`);
     for (const n of niveles) { console.log(` prof ${n.prof}:`); for (const f of n.archivos.slice(0, 15)) console.log(`  ${f}`); if (n.archivos.length > 15) console.log(`  ... y ${n.archivos.length - 15} más`); }
@@ -208,4 +222,5 @@ switch (cmd) {
   default:
     console.error("Uso: generar | deps <archivo> | impacto <archivo> | hubs [n] | frescura | externo <dir> [resumen|frescura]");
     process.exit(1);
+}
 }

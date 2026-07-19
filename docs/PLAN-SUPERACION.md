@@ -35,12 +35,14 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
    coincidencia de plurales (regex singular con `\b` final no matcheaba
    "vulnerabilidades"/"secretos") — corregido y cubierto por el mismo test
    que lo detectó.
-4. 🔶 Memoria y orientación: recuperación relevante (`memoria.mjs buscar`),
-   impacto transitivo (`grafo.mjs impacto`) y orientación estructural
-   (`mapa.mjs`) ya existen, todos `[IMPLEMENTADA]` en el sentido de este
-   documento. Falta selección automática de tests afectados por un cambio
-   (cruzar `git diff` con `grafo.mjs impacto` para filtrar la suite) —
-   **siguiente en la cola**.
+4. ✅ Memoria y orientación: recuperación relevante (`memoria.mjs buscar`),
+   impacto transitivo (`grafo.mjs impacto`), orientación estructural
+   (`mapa.mjs`) y selección de tests afectados (`pruebas.mjs afectadas`,
+   cruza `git diff` con `impactoTransitivo` de `grafo.mjs`) — los cuatro
+   `[IMPLEMENTADA]`. El propio smoke test manual de `pruebas.mjs` encontró
+   un bug real antes de llegar a producción: `[...s1, ...s2]` sobre strings
+   de git hacía spread carácter por carácter en vez de por línea
+   ("Cambiados: 16" con letras sueltas). Corregido y cubierto por eval.
 5. ✅ Legal colombiano: fuentes oficiales allowlisted, vigencia, fecha de
    consulta, incertidumbre calibrada y escalamiento a abogado. Contrato de
    respuesta obligatorio verificado en `evals/legal/validar.mjs`.
