@@ -45,8 +45,13 @@ porque no lo es.
 ## Paso 3 — Ejecuta
 
 1. Prepara el material: `git diff <base>...HEAD` a un archivo temporal +
-   lista de archivos tocados. NO mandes secretos: pasa el diff por el
-   escaneo de patrones de `/spec` fase 5 antes de enviarlo a otro proveedor.
+   lista de archivos tocados. NO mandes secretos — antes de enviar el diff a
+   otro proveedor, redáctalo siempre con código real, no de memoria:
+   ```
+   node <RAIZ>/nucleo/secretos.mjs redactar <archivo-diff>
+   ```
+   Si el resumen en stderr reporta hallazgos, usa la SALIDA redactada (no el
+   diff original) y dilo explícitamente en tu mensaje al otro modelo.
 2. Invoca el CLI en modo no-interactivo con un prompt en español que exige:
    hallazgos con archivo:línea, escenario concreto de fallo, severidad, y
    veredicto final PASA/NO-PASA (modo revision).

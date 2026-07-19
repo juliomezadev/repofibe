@@ -38,7 +38,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | Preámbulo compartido entre skills | ✅ `plantillas/` | `[IMPLEMENTADA]` (archivos versionados, verificados por evals de referencias rotas). Sin build step, sin drift |
 | Enrutamiento inteligente de revisiones | ✅ en `/fabrica` + `nucleo/inteligencia/router.mjs` | `[IMPLEMENTADA]` el router de intención tiene 10 pruebas en `evals/inteligencia/validar.mjs` (incluye el fix de plurales del 2026-07-18) |
 | /autoplan (pipeline CEO→diseño→ing automático) | ✅ `/autoplan` | `[GUIADA]` 6 principios de auto-decisión y cada decisión queda marcada en el plan (auditable); solo el gusto llega al usuario, en un solo lote |
-| /spec (intent→spec en 5 fases) | ✅ `/spec` | `[GUIADA]` Gate de calidad 7/10 auto-puntuado, dedupe contra specs previas, redacción de secretos fail-closed |
+| /spec (intent→spec en 5 fases) | ✅ `/spec` | `[GUIADA]` Gate de calidad 7/10 auto-puntuado, dedupe contra specs previas; redacción de secretos `[IMPLEMENTADA]` (`secretos.mjs`, ver Infraestructura) |
 | /context-save, /context-restore | ✅ `/contexto` | `[IMPLEMENTADA]` `checkpoint.mjs` con eval funcional (guardar/restaurar/aplanar, cierre transitivo verificado) |
 | Modo checkpoint continuo (WIP commits) | ✅ `checkpoint.mjs` + `/construir` | `[IMPLEMENTADA]` `aplanar` solo toca la racha WIP — imposible aplastar commits normales por accidente (verificado en evals) |
 
@@ -72,7 +72,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | /land-and-deploy + /setup-deploy | ✅ `/desplegar` | Núcleo `[IMPLEMENTADA]` (`salud.mjs detectar/base/comparar`, eval con servidor HTTP local real); confirmar el merge e interpretar CI queda `[GUIADA]` — es juicio, no mecánica. Confirmación explícita antes del merge — acción irreversible en sistema compartido |
 | /canary (monitoreo post-deploy) | ✅ `/canario` | Núcleo `[IMPLEMENTADA]` (mismo `salud.mjs`: sondeo con exit code 0/1 y motivos concretos); decidir si una regresión amerita rollback queda `[GUIADA]`, nunca automático. El hash de contenido es informativo, no señal de regresión por sí solo (evita falsos positivos en deploys legítimos) |
 | /benchmark (Core Web Vitals) | ⏳ v0.4 | |
-| /codex (segunda opinión cross-modelo) | ✅ `/segunda-opinion` | `[GUIADA]` multi-motor (Codex → Gemini → Copilot) con fallback honesto etiquetado; redacción de secretos antes de enviar el diff a otro proveedor; análisis cruzado con verificación propia de hallazgos únicos |
+| /codex (segunda opinión cross-modelo) | ✅ `/segunda-opinion` | Detección de motor y análisis cruzado `[GUIADA]`; redacción de secretos antes de enviar el diff `[IMPLEMENTADA]` (`secretos.mjs`, compartido con `/spec`) — fail-closed, eval con detección positiva + ausencia de falsos positivos en placeholders |
 | /retro global multi-proyecto | ⏳ v0.4 | |
 
 ## Infraestructura
@@ -87,6 +87,8 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | Orientación en el repo (gbrain code-def/code-refs) | ✅ `/ubicar` + `mapa.mjs` | `[IMPLEMENTADA]` el núcleo (`mapa.mjs generar/buscar/ver`) tiene eval funcional; el método de búsqueda en cadena de hipótesis de la skill es `[GUIADA]`. gstack necesita una DB con embeddings para esto |
 | Grafo de dependencias / análisis de impacto | ✅ `/grafo` + `grafo.mjs` | `[IMPLEMENTADA]` el núcleo (`grafo.mjs impacto/deps/hubs/frescura`) tiene eval de cierre transitivo; la skill que decide cuándo usar graphify vs el propio es `[GUIADA]`. gstack no tiene nada equivalente |
 | Selección de tests afectados por un cambio | ✅ `/pruebas-afectadas` + `pruebas.mjs` | `[IMPLEMENTADA]` cruza `git diff` (staged+unstaged+untracked, o un rango) con `impactoTransitivo` de `grafo.mjs`; reporta pruebas en el radio Y archivos cambiados sin ningún test que los alcance. gstack no lo tiene |
+| Redacción de secretos antes de enviar código fuera | ✅ `secretos.mjs` | `[IMPLEMENTADA]` fail-closed: AWS, GitHub, GitLab, OpenAI, Slack, JWT, PEM, cadenas de conexión, asignaciones genéricas — con exclusión explícita de placeholders/env-refs para evitar falsos positivos. Compartido por `/segunda-opinion` y `/spec`. gstack redacta secretos en su sync de memoria pero no lo expone como primitiva reutilizable |
+| Salud de deploy (proveedor, medición, comparación) | ✅ `salud.mjs` | `[IMPLEMENTADA]` compartido por `/desplegar` y `/canario` — detección de proveedor por archivos del repo, medición HTTP real con timeout y hash, comparación pura contra línea base con motivos concretos (nunca "hash cambió" solo, evita falsos positivos en deploys legítimos) |
 | Sync de memoria entre máquinas (repo git privado) | ⏳ v0.4 | Con escáner de secretos antes de push |
 | Telemetría opt-in a Supabase | 🚫 | Decisión de privacidad: analítica local siempre, remota nunca por defecto |
 | Defensa anti prompt-injection (clasificador ML, canary) | ⏳ v0.2+ | El canary token y las reglas de contenido no confiable no requieren ML y entran antes |

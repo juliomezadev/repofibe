@@ -53,10 +53,13 @@ ciclos; si no llega a 7, di qué información falta del usuario.
 
 ## Fase 5 — Archivo
 
-1. **Redacción de secretos (fail-closed):** antes de escribir, escanea el
-   texto por claves API, tokens, cadenas de conexión, bloques PEM, JWTs
-   (patrones: `sk-`, `ghp_`, `AKIA`, `postgres://user:pass@`, `-----BEGIN`,
-   `eyJ` largo). Si aparece algo, reemplázalo por `<REDACTADO>` y avisa.
+1. **Redacción de secretos (fail-closed, código real con eval):** antes de
+   escribir el archivo, pasa el borrador por el script:
+   ```
+   node <RAIZ>/nucleo/secretos.mjs redactar <archivo-borrador>
+   ```
+   Si el resumen en stderr reporta hallazgos, usa la salida redactada (no el
+   borrador original) y avisa al usuario qué tipos se redactaron.
 2. Guarda en `docs/fabrica/specs/AAAA-MM-DD-<tema>-spec.md`.
 3. Registra:
    ```

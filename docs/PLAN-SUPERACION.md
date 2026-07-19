@@ -60,15 +60,18 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
    corren sobre `nucleo/salud.mjs` `[IMPLEMENTADA]` — detección de
    proveedor, medición HTTP real (fetch + timeout + hash de contenido) y
    comparación pura contra línea base, con eval funcional que levanta un
-   servidor HTTP local real (sin red externa). Lo que queda GUIADA es
-   exactamente lo que debe serlo: confirmar el merge, interpretar CI,
-   decidir si una regresión amerita rollback — juicio del usuario, no
-   código. El propio smoke test encontró un bug de lógica real antes de
-   integrarlo: la comparación trataba "contenido cambió + antes era error,
-   ahora 200" como regresión, cuando en realidad detectaba una
-   *recuperación*; y un hash distinto por sí solo no distingue deploy
-   legítimo de página de error — corregido, ese campo quedó informativo,
-   nunca decide el estado. Navegador propio y benchmark siguen PLANEADOS.
+   servidor HTTP local real (sin red externa). `/segunda-opinion` y `/spec`
+   ahora corren sobre `nucleo/secretos.mjs` `[IMPLEMENTADA]` — redacción de
+   secretos fail-closed (AWS, GitHub, GitLab, OpenAI, Slack, JWT, PEM,
+   cadenas de conexión, asignaciones genéricas) con eval que cubre
+   detección positiva, ausencia de falsos positivos en placeholders/env
+   refs, y un caso específico que fija en rojo el bug real encontrado antes
+   de shipear (el chequeo de placeholder usaba el nombre de la clave en vez
+   del valor cuando la clave era más larga que el umbral). Lo que queda
+   GUIADA en las tres skills es exactamente lo que debe serlo: confirmar el
+   merge, interpretar CI, decidir si una regresión amerita rollback,
+   interpretar la opinión de otro modelo — juicio del usuario, no código.
+   Navegador propio y benchmark siguen PLANEADOS.
 
 **Nota de calibración (2026-07-18):** varias filas de `COMPARACION-GSTACK.md`
 marcadas ✅ corresponden a skills en Markdown (categoría GUIADA de este

@@ -4,6 +4,17 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`nucleo/secretos.mjs`**: redacción de secretos fail-closed compartida
+  por `/segunda-opinion` (antes de mandar un diff a otro proveedor de IA) y
+  `/spec` (antes de archivar una spec) — AWS, GitHub, GitLab, OpenAI, Slack,
+  JWT, PEM y cadenas de conexión por patrones de alta confianza, más
+  asignaciones genéricas con exclusión explícita de placeholders y
+  referencias a variables de entorno para no destruir código legítimo. El
+  propio test funcional encontró un bug real antes de integrarlo: el
+  chequeo de "¿esto es un placeholder?" podía comparar contra el NOMBRE de
+  la clave (`access_token`) en vez del valor, cuando el nombre era más
+  largo que el umbral — corregido con referencia explícita al grupo
+  capturado, ya no heurística.
 - **`nucleo/salud.mjs`**: núcleo mecánico compartido de `/desplegar` y
   `/canario` — detección de proveedor de deploy, medición HTTP real
   (código, latencia, hash de contenido, timeout) y comparación pura contra
