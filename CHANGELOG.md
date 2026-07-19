@@ -4,6 +4,14 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`/scrape` + `nucleo/dominio.mjs`**: extracción de datos reales de una
+  página con `navegador.mjs` (navegar, snapshot, leer refs) — hereda
+  automáticamente la defensa anti prompt-injection de `no-confiable.mjs`
+  sin código nuevo, porque reutiliza las mismas acciones de `navegador.mjs`.
+  `dominio.mjs` implementa domain-skills: notas persistentes por sitio con
+  ciclo de confianza cuarentena → activa tras 3 usos registrados (mismo
+  modelo que gstack), con eval funcional que cubre normalización de
+  dominio, promoción, aislamiento entre dominios y retiro.
 - **Evals tier 2** (`evals/tier2.mjs` + `evals/e2e/sprint-completo.mjs`):
   sesión de sprint completa simulada, sin LLM — `estado.mjs iniciar` hasta
   `etapa retro`, pasando por `checkpoint.mjs` (guardar y aplanar),

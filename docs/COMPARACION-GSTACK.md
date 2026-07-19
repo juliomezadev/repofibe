@@ -53,7 +53,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | Handoff a navegador visible (CAPTCHA/MFA) | ⏳ v0.3 | |
 | GStack Browser con branding/stealth | 🚫 | Valor marginal frente al costo; el daemon estándar basta |
 | /pair-agent (compartir navegador entre agentes) | ⏳ v0.4 | |
-| /scrape + domain-skills | ⏳ v0.3 | |
+| /scrape + domain-skills | ✅ `/scrape` + `dominio.mjs` | `[GUIADA]` sobre `navegador.mjs` `[IMPLEMENTADA]` para la navegación; `dominio.mjs` `[IMPLEMENTADA]` con eval funcional para las notas por sitio (cuarentena → activa tras 3 usos, mismo modelo que gstack). v1 no pagina ni hace scroll infinito automático — declarado como límite honesto en la skill |
 
 ## Diseño
 
