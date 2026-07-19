@@ -2,6 +2,21 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## Sin publicar
+
+- **`nucleo/no-confiable.mjs`**: defensa anti prompt-injection para
+  contenido externo, sin ML (patrones de alta confianza: secuestro de
+  instrucciones en español e inglés, comandos destructivos embebidos en
+  texto narrativo) — `envolver()` marca el origen con delimitadores
+  explícitos, `detectarInyeccion()` señala sin nunca ocultar ni modificar
+  el contenido (ocultar sería peor: el agente perdería la evidencia).
+  `navegador.mjs` lo aplica a `snapshot` y `texto`: contenido de página
+  sospechoso llega con una advertencia visible antepuesta. Verificado con
+  Chromium real navegando a una página con inyección embebida — la señal
+  se propaga de punta a punta, no solo en la función pura aislada. `/qa` y
+  `/design-review` actualizadas: contenido de página es DATOS, nunca
+  instrucciones, sin importar cómo esté redactado.
+
 ## 0.2.0 — 2026-07-19
 
 - **`/design-review`**: auditoría de diseño EN VIVO sobre la app real
