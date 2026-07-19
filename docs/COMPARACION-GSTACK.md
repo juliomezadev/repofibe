@@ -79,7 +79,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
-| Multi-host (10 agentes) | 🔶 6 hosts | claude, antigravity, codex, cursor, opencode, generico. `[IMPLEMENTADA]` para genérico (`evals/seguridad/instalacion-segura.mjs` cubre instalar/refrescar/desinstalar con ownership real); Claude Code y Antigravity sin eval dedicada aún. Sin config TypeScript por host — estándar Agent Skills + tabla en instalar.mjs |
+| Multi-host (10 agentes) | 🔶 6 hosts | claude, antigravity, codex, cursor, opencode, generico. `[IMPLEMENTADA]` para genérico, claude y antigravity (`evals/seguridad/instalacion-segura.mjs` + `instalacion-hosts.mjs`: instalar/refrescar/desinstalar con ownership real, fallback determinista sin CLI de claude, bloque+lanzadores de Antigravity); codex/cursor/opencode comparten el mismo código pero sin eval dedicada. Sin config TypeScript por host — estándar Agent Skills + tabla en instalar.mjs |
 | Evals tier 1 (estático, gratis) | ✅ | `[IMPLEMENTADA]` — además ejecuta núcleo, hooks e inteligencia de verdad (4 suites unificadas en `validar.mjs`) |
 | Evals tier 2 (E2E con sesión real) | ⏳ v0.2 | |
 | Evals tier 3 (LLM-juez) | ⏳ v0.3 | |

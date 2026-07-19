@@ -4,6 +4,29 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **Evals de instalación por host** (`evals/seguridad/instalacion-hosts.mjs`):
+  Claude Code (fallback determinista a copia de skills cuando la CLI
+  `claude` no está en PATH, sin depender de si la máquina de CI la tiene) y
+  Antigravity (skills + bloque de reglas en `GEMINI.md` sin borrar contenido
+  del usuario + lanzadores de workflow) — instalar/refrescar/ownership/
+  desinstalar, los cuatro verificados de extremo a extremo con hogares
+  temporales. Antes solo el host genérico tenía esta cobertura.
+- **`/pruebas-afectadas`**: selección de tests por impacto — cruza `git
+  diff` con el grafo de imports (`grafo.mjs impactoTransitivo`, ahora
+  exportado como función reutilizable) para reportar qué pruebas caen en
+  el radio de un cambio y qué archivos cambiaron sin ningún test que los
+  alcance.
+- **Calibración honesta GUIADA vs IMPLEMENTADA** en
+  `docs/COMPARACION-GSTACK.md`: cada fila declara si tiene código con eval
+  que la ejecuta de verdad o es una skill en Markdown que depende del
+  modelo.
+- **Tres correcciones de seguridad reales**: el router de intención no
+  matcheaba plurales (bug de regex con `\b` final); la auto-actualización
+  era opt-out por descuido en vez de opt-in estricto y calculaba la raíz
+  del repo por aritmética de rutas en vez de `git rev-parse
+  --show-toplevel`; el desinstalador dejaba una línea en blanco huérfana al
+  remover un bloque de reglas. Las tres, cubiertas por evals ahora
+  integradas al runner principal.
 - **`/autoplan`**: las tres revisiones del plan (CEO → diseño → ingeniería)
   en un solo comando. Auto-decide lo objetivo con seis principios codificados
   y deja cada decisión marcada en el plan; solo las decisiones de gusto

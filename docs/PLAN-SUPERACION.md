@@ -46,9 +46,16 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
 5. ✅ Legal colombiano: fuentes oficiales allowlisted, vigencia, fecha de
    consulta, incertidumbre calibrada y escalamiento a abogado. Contrato de
    respuesta obligatorio verificado en `evals/legal/validar.mjs`.
-6. 🔶 Adaptadores multi-host: instalación/actualización/desinstalación
-   probadas para el host genérico (`.agent/skills` + `AGENTS.md`); faltan
-   pruebas equivalentes para Claude Code (plugin nativo) y Antigravity.
+6. ✅ Adaptadores multi-host: instalación/actualización/desinstalación con
+   evals funcionales para genérico (`evals/seguridad/instalacion-segura.mjs`)
+   y ahora también Claude Code y Antigravity
+   (`evals/seguridad/instalacion-hosts.mjs`) — hogar temporal, PATH filtrado
+   para forzar el fallback a copia de forma determinista sin depender de si
+   la máquina tiene el CLI de `claude` instalado, ownership verificado
+   (edición del usuario sobrevive a refrescar/quitar), y para Antigravity
+   además el bloque de reglas en `GEMINI.md` y los lanzadores de workflow.
+   codex/cursor/opencode comparten la misma función `copiarSkills` que ya
+   está cubierta indirectamente; sin eval dedicada por host todavía.
 7. 🔶 Navegador, deploy, canary y benchmark: `/desplegar` y `/canario` ya
    existen como skills GUIADAS (instrucción para el modelo, sin código
    ejecutable propio); navegador y benchmark siguen PLANEADOS. Ninguno de
