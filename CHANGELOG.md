@@ -4,6 +4,20 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **Evals tier 2** (`evals/tier2.mjs` + `evals/e2e/sprint-completo.mjs`):
+  sesión de sprint completa simulada, sin LLM — `estado.mjs iniciar` hasta
+  `etapa retro`, pasando por `checkpoint.mjs` (guardar y aplanar),
+  `grafo.mjs` (generar e impacto) y `pruebas.mjs` (afectadas), verificando
+  que el estado, la memoria y el historial de git se mantienen correctos
+  de punta a punta — el tipo de bug de integración entre scripts que los
+  tests aislados de tier 1 no pueden atrapar. Job separado en CI (tier 1
+  promete <5s; tier 2 encadena ~15 subprocesos reales). El propio test
+  encontró un gap real al construirse: `pruebas.mjs afectadas` sin
+  argumento compara el árbol de trabajo, pero si `checkpoint.mjs` ya
+  commiteó el cambio (checkpoint continuo), el árbol vuelve a estar limpio
+  y la comparación no encuentra nada útil — documentado como trampa real
+  en `/pruebas-afectadas` con la solución (pasar el commit base del sprint
+  como rango explícito).
 - **`nucleo/no-confiable.mjs`**: defensa anti prompt-injection para
   contenido externo, sin ML (patrones de alta confianza: secuestro de
   instrucciones en español e inglés, comandos destructivos embebidos en

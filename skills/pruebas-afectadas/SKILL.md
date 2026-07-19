@@ -57,3 +57,13 @@ inyección de dependencias sin import directo, no aparece en el radio de
 impacto aunque sí lo cubra en la práctica. Dilo si el usuario pregunta por
 garantías — esto es "reduce el conjunto a probar primero", no "prueba que
 cubriste todo".
+
+**Trampa real con checkpoint continuo** (encontrada por la eval tier 2,
+`evals/e2e/sprint-completo.mjs`): `pruebas.mjs afectadas` sin argumento
+compara el ÁRBOL DE TRABAJO — pero `checkpoint.mjs guardar` hace
+`git add -A` antes de commitear, así que si `/contexto` con checkpoint
+continuo ya guardó el cambio, el árbol de trabajo vuelve a estar limpio y
+"afectadas" sin argumento no encuentra nada útil (solo archivos de estado
+sueltos como `.fabrica/sprint.json`). Con checkpoint continuo activo, usa
+siempre un rango explícito contra el commit BASE del sprint:
+`node <RAIZ>/nucleo/pruebas.mjs afectadas <commit-base-del-sprint>`.

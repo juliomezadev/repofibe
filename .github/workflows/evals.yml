@@ -19,3 +19,17 @@ jobs:
           node-version: 20
       - name: Evals tier 1 (estructura + funcionales)
         run: node evals/validar.mjs
+
+  tier2:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Evals tier 2 (E2E, sesión de sprint completa simulada)
+        run: node evals/tier2.mjs

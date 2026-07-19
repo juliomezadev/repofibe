@@ -110,19 +110,23 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 ## Calidad del propio repo
 
 ```bash
-node evals/validar.mjs
+node evals/validar.mjs   # tier 1: gratis, <5s, corre en cada push
+node evals/tier2.mjs     # tier 2: E2E, sesión de sprint completa simulada
 ```
 
-Tier 1, gratis, <5 segundos: valida frontmatter y convenciones de las 29
-skills, manifiestos, hooks — y ejecuta de verdad `estado`, `memoria` y
-`guardia` contra un directorio temporal (incluidos los casos "rm -rf → ask",
-"--force-with-lease → silencio" y "edición fuera del congelado → deny").
+Tier 1 valida frontmatter y convenciones de las 29 skills, manifiestos,
+hooks — y ejecuta de verdad `estado`, `memoria`, `guardia`, `grafo`,
+`secretos`, `salud` y `navegador` contra directorios temporales (incluidos
+los casos "rm -rf → ask", "--force-with-lease → silencio", "edición fuera
+del congelado → deny", y detección de prompt-injection con Chromium real
+cuando Playwright está instalado). Tier 2 encadena una sesión de sprint
+completa (pensar→retro, ~15 subprocesos reales) verificando que el estado
+fluye correctamente entre `estado.mjs`, `checkpoint.mjs`, `grafo.mjs` y
+`pruebas.mjs` — el tipo de bug de integración que tests aislados no
+atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
 
 ## Hoja de ruta
 
-- **v0.3** — daemon persistente de navegador para `/qa` y `/design-review`,
-  evals tier 2 (E2E con sesión real), defensa anti prompt-injection
-  (canary token + reglas de contenido no confiable).
 - **v0.4** — `/design-shotgun` (variantes + tablero + taste memory),
   `/scrape` + domain-skills, import de cookies del navegador real,
   evals tier 3 (LLM-juez).
