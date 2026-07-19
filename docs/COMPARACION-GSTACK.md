@@ -58,7 +58,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
 | /document-release + /document-generate (Diataxis) | ✅ `/docs` | Una skill, dos modos (actualizar drift / generar desde cero). **Mejora**: todo comando documentado se EJECUTA antes de documentarse — los docs no pueden mentir |
-| /land-and-deploy + /setup-deploy | ⏳ v0.3 | |
+| /land-and-deploy + /setup-deploy | ✅ `/desplegar` | Detección de proveedor (Vercel/Netlify/Fly/Pages/manual) + verificación de salud HTTP REAL post-deploy (regla 1: evidencia, no "debería estar arriba"). Confirmación explícita antes del merge — acción irreversible en sistema compartido |
 | /canary (monitoreo post-deploy) | ⏳ v0.4 | |
 | /benchmark (Core Web Vitals) | ⏳ v0.4 | |
 | /codex (segunda opinión cross-modelo) | ✅ `/segunda-opinion` | **Mejora**: multi-motor (Codex → Gemini → Copilot) con fallback honesto etiquetado; redacción de secretos antes de enviar el diff a otro proveedor; análisis cruzado con verificación propia de hallazgos únicos |

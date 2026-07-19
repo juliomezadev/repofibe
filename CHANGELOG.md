@@ -14,6 +14,11 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/desplegar`**: de PR aprobado a verificado en producción — detecta el
+  proveedor de deploy (Vercel/Netlify/Fly/GitHub Pages/manual), mergea con
+  confirmación explícita (acción irreversible en sistema compartido), espera
+  CI y el deploy, y verifica salud con una petición HTTP real a producción
+  en vez de asumir que "debería estar arriba".
 - **`/segunda-opinion`**: revisión independiente del diff por otro modelo
   (Codex → Gemini → Copilot CLI, con fallback honesto etiquetado cuando no
   hay cross-modelo real). Redacta secretos antes de enviar el diff a otro
