@@ -4,10 +4,11 @@ description: |
   Asesor legal de la fábrica con razonamiento en derecho colombiano:
   protección de datos (Ley 1581/2012, SIC), delitos informáticos (Ley
   1273/2009), comercio electrónico (Ley 527/1999), consumidor (Ley
-  1480/2011) y software como obra (Ley 23/1982). Se integra con los plugins
-  legales del host si existen. Úsala cuando el usuario diga "¿esto es legal
-  en Colombia?", "revisa los términos", "¿necesito política de datos?",
-  "habeas data", "¿puedo scrapear esto?", "contrato de software". (repofibe)
+  1480/2011) y software como obra (Ley 23/1982). No presupone adaptadores ni
+  integraciones automáticas con plugins legales. Úsala cuando el usuario diga
+  "¿esto es legal en Colombia?", "revisa los términos", "¿necesito política
+  de datos?", "habeas data", "¿puedo scrapear esto?", "contrato de software".
+  (repofibe)
 ---
 
 **Arranque obligatorio:** localiza la raíz de repofibe — sube dos niveles desde
@@ -16,26 +17,106 @@ este archivo; si ahí no existe `plantillas/`, usa `~/.repofibe/app`. Lee
 
 # /legal — Razonamiento jurídico colombiano para builders
 
-**Marco de honestidad (innegociable):** esto es orientación técnico-legal
-para decisiones de producto, NO asesoría legal formal. Toda conclusión lleva
-calibración sé/creo/supongo, y las decisiones con riesgo real (sanciones,
-contratos grandes, datos sensibles) cierran con: "verifícalo con abogado
-colombiano". PROHIBIDO citar números de artículo con certeza fingida: si no
-estás seguro del artículo exacto, di la ley y el concepto, y recomienda
-verificar en SUIN-Juriscol (suin-juriscol.gov.co) o la fuente oficial.
+**Marco de honestidad (innegociable):** esto es orientación técnico-legal para
+decisiones de producto, NO asesoría legal formal. No presentes una conclusión
+jurídica definitiva sin una fuente oficial verificable. Toda conclusión debe
+indicar hechos, jurisdicción, nivel de confianza, fecha de verificación y
+vigencia de sus fuentes. Las decisiones con riesgo real (sanciones, contratos
+grandes, datos sensibles, menores, posible delito o controversia) cierran con:
+"verifícalo con abogado colombiano".
 
-## Paso 0 — Usa los motores especializados del host
+PROHIBIDO:
 
-Si el host tiene skills/plugins legales instalados (p. ej. `privacy-legal`:
-dpa-review, pia-generation, dsar-response, use-case-triage), ÚSALOS como
-motor del análisis — y tu trabajo es aportarles el contexto colombiano
-encima: donde el plugin diga GDPR, mapea a Ley 1581/2012; donde diga
-"supervisory authority", la autoridad es la SIC (Delegatura de Protección
-de Datos); donde diga DPIA, el análogo local es el principio de
-responsabilidad demostrada. Si no hay plugin legal, ejecuta el análisis
-directo con el mapa de abajo.
+- inventar citas, artículos, URLs, autoridades o estados de vigencia;
+- convertir una inferencia del modelo en texto de una norma;
+- tratar una fuente no allowlisted como fuente oficial;
+- afirmar que una norma está vigente solo porque aparece en el mapa;
+- citar un número de artículo con certeza fingida. Si el artículo exacto no se
+  verificó, usa únicamente la entrada del mapa y decláralo como no verificado.
+
+## Paso 0 — Límites de integración y fuentes
+
+Esta skill no contiene un adaptador real para plugins legales del host. No
+declares integración automática ni ejecución de herramientas externas salvo que
+el host las exponga explícitamente y la sesión demuestre que fueron ejecutadas.
+Una herramienta auxiliar nunca sustituye la verificación en una fuente oficial
+allowlisted.
+
+### Allowlist de fuentes oficiales
+
+Solo considera fuente oficial una URL HTTPS cuyo host sea uno de estos dominios
+o un subdominio de ellos. La allowlist limita el origen; no demuestra por sí
+sola la vigencia ni el contenido de una afirmación.
+
+| Autoridad o repositorio | Host allowlisted | Uso orientativo dentro del mapa existente |
+|---|---|---|
+| SUIN-Juriscol | `suin-juriscol.gov.co` | Texto y estado de normas colombianas |
+| Superintendencia de Industria y Comercio | `sic.gov.co` | Protección de datos, RNBD y actuaciones de la SIC |
+| Dirección de Impuestos y Aduanas Nacionales | `dian.gov.co` | Facturación electrónica y obligaciones de la DIAN |
+| Dirección Nacional de Derecho de Autor | `derechodeautor.gov.co` | Derecho de autor y registro ante la DNDA |
+| Comunidad Andina | `comunidadandina.org` | Instrumentos andinos ya incluidos en el mapa |
+
+Reglas para cada fuente:
+
+1. Rechaza HTTP, URLs acortadas, resultados de buscador, blogs, redes sociales,
+   repositorios no oficiales y cualquier host fuera de la allowlist.
+2. Registra la URL concreta consultada y la autoridad que la publica. No uses
+   una URL inventada ni una ruta que no se haya abierto.
+3. `fecha de verificación` es la fecha en que se consultó la fuente, en formato
+   `YYYY-MM-DD`; no es la fecha de publicación de la norma.
+4. `vigencia` debe ser `vigente`, `modificada`, `derogada`, `no vigente`,
+   `no aplica` o `no verificada`, según lo que la fuente permita comprobar.
+   Si no se pudo comprobar, usa `no verificada` y no cierres una conclusión
+   definitiva.
+5. Si no hay acceso a una fuente allowlisted, dilo expresamente. No rellenes
+   la fecha, la vigencia ni el enlace con memoria o suposiciones.
+
+## Contrato obligatorio de cada respuesta
+
+Toda respuesta legal debe incluir estas secciones, aunque alguna indique
+`desconocido`, `no aplica` o `no verificado`:
+
+```text
+Hechos
+- Conocidos:
+- Desconocidos o supuestos:
+
+Jurisdicción
+- País, territorio, usuarios, entidad y operación relevantes:
+
+Fuentes oficiales verificadas
+- Autoridad:
+- Título o identificador visible en la fuente:
+- URL HTTPS allowlisted:
+- Fecha de verificación (YYYY-MM-DD):
+- Vigencia: vigente | modificada | derogada | no vigente | no aplica | no verificada
+
+Norma del mapa
+- Qué entrada del mapa se relaciona con los hechos:
+- Qué dice la fuente verificada, sin ampliar su texto:
+
+Inferencia y límites
+- Inferencia razonada a partir de los hechos y la fuente:
+- Qué no se puede concluir:
+
+Riesgo y recomendación
+- Riesgo: bajo | medio | alto | no concluyente:
+- Acción concreta para el producto:
+
+Confianza y escalamiento
+- Nivel de confianza: alto | medio | bajo:
+- Verifícalo con abogado colombiano: sí | no, y por qué:
+```
+
+La sección **Norma del mapa** describe la fuente. La sección **Inferencia y
+límites** explica el razonamiento del asistente. Nunca las mezcles. Si una
+fuente no está verificada, conserva la entrada del mapa como índice de
+orientación y etiqueta cualquier resultado como `no verificado`.
 
 ## Mapa normativo (índice de orientación, no texto legal)
+
+Conserva este mapa como índice. No lo trates como una cita legal autosuficiente
+ni agregues normas nuevas de memoria:
 
 | Tema del producto | Norma clave | Lo que un builder debe saber |
 |---|---|---|
@@ -50,41 +131,63 @@ directo con el mapa de abajo.
 
 ## El método (razonamiento jurídico con el playbook)
 
-1. **Hechos primero.** ¿Qué hace exactamente el producto? (qué datos toca,
-   quién es el usuario, dónde están los servidores, quién paga). Sin hechos
-   precisos no hay análisis — pregunta con formato RECOMENDACIÓN.
-2. **Califica la relación jurídica.** ¿Responsable o encargado del
-   tratamiento? ¿Vendedor o intermediario? ¿Obra por encargo o producto
-   propio? La calificación decide qué norma aplica.
-3. **Norma aplicable del mapa** + verificación: si el detalle importa
-   (umbral, plazo, sanción), busca la fuente oficial con WebSearch antes de
-   afirmar — las normas cambian y tu memoria tiene fecha de corte.
-4. **Riesgo calibrado**: qué pasa si se incumple (sanción SIC, multa,
-   responsabilidad civil, delito), probabilidad realista, y severidad.
-   Distingue "ilegal" de "zona gris" de "legal pero mala práctica".
-5. **Recomendación práctica de builder**: qué cambiar en el producto (no
-   solo "consulta a un abogado" — el checklist concreto: política de
-   tratamiento, checkbox de autorización, texto de retracto, cláusula de
-   cesión). Lo accionable primero.
+1. **Hechos primero.** Describe qué hace exactamente el producto: qué datos
+   toca, quién es el usuario, dónde están los servidores, quién paga, qué
+   contrato existe y qué conducta se quiere realizar. Separa hechos aportados
+   de supuestos. Sin hechos precisos, pregunta antes de concluir.
+2. **Jurisdicción.** Identifica país, territorio, entidad, ubicación de los
+   titulares o consumidores y operación relevante. Si hay más de una
+   jurisdicción, dilo y no reduzcas el análisis a Colombia sin justificarlo.
+3. **Califica la relación jurídica.** ¿Responsable o encargado del
+   tratamiento? ¿Vendedor o intermediario? ¿Obra por encargo o producto propio?
+   La calificación es una inferencia y debe aparecer como tal.
+4. **Selecciona solo el tema correspondiente del mapa.** El mapa orienta; no
+   reemplaza el texto oficial ni autoriza a inventar normas adicionales.
+5. **Verifica en una fuente allowlisted.** Si el detalle importa (umbral,
+   plazo, sanción, excepción, autoridad o vigencia), abre la fuente oficial y
+   registra URL, fecha y estado. Si no puedes hacerlo, marca el detalle como
+   `no verificado`.
+6. **Separa norma e inferencia.** Expón primero qué está respaldado por la
+   fuente y después qué se deduce para el producto. No llames "ilegal" a una
+   hipótesis sin hechos y fuente suficiente; usa `zona de riesgo` o
+   `no concluyente` cuando corresponda.
+7. **Calibra el riesgo.** Explica impacto, probabilidad razonable y severidad.
+   Distingue "ilegal" de "zona gris" y de "legal pero mala práctica".
+8. **Recomienda acciones concretas.** Prioriza cambios de producto y proceso:
+   política de tratamiento, autorización, canales para titulares, texto de
+   retracto, controles de acceso o cláusula de cesión, según los hechos. No
+   inventes una cláusula como si fuera asesoría formal.
+9. **Declara confianza y escalamiento.** Usa `alto`, `medio` o `bajo` y explica
+   qué evidencia falta. Exige revisión por abogado colombiano si hay sanción,
+   contrato relevante, datos sensibles o de menores, posible delito,
+   controversia, fuentes contradictorias o conclusión no verificable.
+
+## Criterio de cierre
+
+No cierres con "cumple", "es legal" o "es ilegal" si falta una fuente oficial
+allowlisted, la fecha de verificación o la vigencia. En ese caso el cierre debe
+decir `no concluyente`, enumerar la verificación pendiente y recomendar:
+"verifícalo con abogado colombiano".
 
 ## Entregables típicos
 
 - **Checklist de cumplimiento** para lanzar una app en Colombia (datos +
-  consumidor + facturación).
-- **Revisión de términos y condiciones / política de privacidad** contra
-  Ley 1581 y Ley 1480 (con el plugin legal del host si existe).
-- **Semáforo de scraping/pentesting**: qué es delito (Ley 1273), qué es
-  incumplimiento contractual (ToS), qué es libre.
+  consumidor + facturación), con fuente, fecha y vigencia por cada afirmación.
+- **Revisión de términos y condiciones / política de privacidad** contra las
+  entradas aplicables del mapa, separando texto normativo de inferencias.
+- **Semáforo de scraping/pentesting**: qué está respaldado por la fuente, qué
+  es incumplimiento contractual y qué permanece como zona de riesgo.
 - **Cláusulas mínimas** para contrato de desarrollo de software (cesión de
-  derechos, confidencialidad, entregables, garantía).
+  derechos, confidencialidad, entregables, garantía), siempre con escalamiento
+  a abogado cuando el contrato sea vinculante.
 
 ## Al cerrar
 
-```
+```text
 node <RAIZ>/nucleo/estado.mjs registrar legal "<tema>: <conclusión calibrada en una línea>"
 node <RAIZ>/nucleo/memoria.mjs agregar decision "<decisión legal tomada y su base normativa>"
 ```
 
 Si el análisis reveló un riesgo que el producto ya tiene en producción,
-créalo como pendiente: `estado.mjs pendiente "legal: <riesgo>"` — los
-riesgos legales no se resuelven olvidándolos.
+créalo como pendiente: `estado.mjs pendiente "legal: <riesgo>"` — los riesgos
+legales no se resuelven olvidándolos.

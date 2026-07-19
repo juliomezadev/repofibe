@@ -41,10 +41,13 @@ si shipea igual — soberanía del usuario).
 5. **Docs al día.** Diff vs README/docs: ¿algún comando, flag o flujo
    documentado cambió? Actualízalo en este mismo PR — los docs desactualizados
    son bugs.
-6. **Commit + push + PR.** Commits atómicos ya existen (de /construir y /qa);
-   escribe el mensaje final si hay algo suelto. Push. PR con `gh pr create`
-   si hay GitHub (título imperativo, cuerpo: qué/por qué/cómo se probó);
-   si no hay gh/remote, deja la rama lista y dilo.
+6. **Commit + push + PR.** Si HEAD es una racha de commits `WIP:` (checkpoints
+   de /contexto), consolídala primero:
+   `node <RAIZ>/nucleo/checkpoint.mjs aplanar "<mensaje definitivo>"` — solo
+   toca los WIP, bisect queda limpio. Los commits atómicos ya existen (de
+   /construir y /qa); escribe el mensaje final si hay algo suelto. Push. PR
+   con `gh pr create` si hay GitHub (título imperativo, cuerpo: qué/por
+   qué/cómo se probó); si no hay gh/remote, deja la rama lista y dilo.
 
 ## Al cerrar
 

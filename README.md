@@ -3,7 +3,7 @@
 **Tu equipo de ingeniería virtual, en español.** Un CEO que reta el alcance,
 un eng manager que firma la arquitectura, una diseñadora que caza el AI slop,
 un staff engineer que encuentra los bugs que CI no ve, un QA con ojos, un CSO
-sin ruido y un release engineer que shipea el PR. Catorce especialistas que
+sin ruido y un release engineer que shipea el PR. 23 especialistas que
 trabajan como trabaja un buen equipo: con proceso, con estado y con memoria.
 
 Inspirado en [gstack](https://github.com/garrytan/gstack) de Garry Tan —
@@ -107,7 +107,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 node evals/validar.mjs
 ```
 
-Tier 1, gratis, <5 segundos: valida frontmatter y convenciones de las 14
+Tier 1, gratis, <5 segundos: valida frontmatter y convenciones de las 23
 skills, manifiestos, hooks — y ejecuta de verdad `estado`, `memoria` y
 `guardia` contra un directorio temporal (incluidos los casos "rm -rf → ask",
 "--force-with-lease → silencio" y "edición fuera del congelado → deny").

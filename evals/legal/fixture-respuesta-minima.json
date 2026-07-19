@@ -1,0 +1,22 @@
+{
+  "tema_del_mapa": "Datos personales",
+  "hechos": {
+    "conocidos": ["El producto procesa datos de usuarios en Colombia."],
+    "desconocidos_o_supuestos": ["No se ha confirmado la ubicación de los servidores."]
+  },
+  "jurisdiccion": "Colombia",
+  "fuentes_oficiales_verificadas": [
+    {
+      "autoridad": "SIC",
+      "titulo": "Portal institucional",
+      "url": "https://www.sic.gov.co/",
+      "fecha_verificacion": "2026-07-18",
+      "vigencia": "no verificada"
+    }
+  ],
+  "norma_del_mapa": "La entrada del mapa aplicable debe verificarse en la fuente oficial.",
+  "inferencia": "No se emite una conclusión definitiva sin comprobar la fuente y los hechos faltantes.",
+  "riesgo": "no concluyente",
+  "nivel_de_confianza": "bajo",
+  "escalamiento_a_abogado": true
+}

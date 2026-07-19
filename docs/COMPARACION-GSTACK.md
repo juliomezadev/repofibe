@@ -28,8 +28,8 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | Enrutamiento inteligente de revisiones | ✅ en `/fabrica` | |
 | /autoplan (pipeline CEO→diseño→ing automático) | ✅ `/autoplan` | **Mejora**: 6 principios de auto-decisión y cada decisión queda marcada en el plan (auditable); solo el gusto llega al usuario, en un solo lote |
 | /spec (intent→spec en 5 fases) | ✅ `/spec` | Gate de calidad 7/10 auto-puntuado, dedupe contra specs previas, redacción de secretos fail-closed |
-| /context-save, /context-restore | 🔶 | El estado del sprint + hook SessionStart cubren el caso principal; falta snapshot completo de contexto |
-| Modo checkpoint continuo (WIP commits) | ⏳ v0.2 | |
+| /context-save, /context-restore | ✅ `/contexto` | Checkpoints WIP con contexto del sprint en el cuerpo + restauración completa (checkpoints + sprint + árbol) |
+| Modo checkpoint continuo (WIP commits) | ✅ `checkpoint.mjs` + `/construir` | **Mejora**: `aplanar` solo toca la racha WIP — imposible aplastar commits normales por accidente (verificado en evals) |
 
 ## Navegador y ojos
 

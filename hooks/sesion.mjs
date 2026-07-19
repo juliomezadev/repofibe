@@ -30,10 +30,11 @@ function chequearActualizacion() {
     // Hay versión nueva y es fast-forward limpio. Auto-actualizar es el
     // default ("que lo actualice de una"); se apaga con
     // ~/.repofibe/config.json → {"auto_actualizar": false}.
-    let auto = true;
+    let auto = false;
     try { auto = JSON.parse(readFileSync(join(homedir(), ".repofibe", "config.json"), "utf8")).auto_actualizar !== false; } catch {}
     if (auto) {
       try {
+        const sucio = git(["status", "--porcelain"]); if (sucio) throw new Error("dirty");
         git(["pull", "--ff-only", "--quiet"], 15000);
         execFileSync(process.execPath, [join(raiz, "nucleo", "instalar.mjs"), "--refrescar"], { timeout: 15000, stdio: "ignore" });
         const v = readFileSync(join(raiz, "VERSION"), "utf8").trim();
@@ -78,7 +79,7 @@ try {
   if (partes.length) {
     process.stdout.write(
       "[repofibe] Contexto de la fábrica:\n" + partes.join("\n") +
-      "\nSkills: /fabrica (orquestador), /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs.\n"
+      "\nSkills: /fabrica (orquestador), /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs, /contexto.\n"
     );
   }
   process.exit(0);

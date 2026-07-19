@@ -32,7 +32,10 @@ SIN desviarte a refactors no pedidos.
    (config, docs), verifica ejecutando el flujo real.
 4. **Checkpoint por paso.** Commit atómico al completar cada paso con mensaje
    en español: `<área>: <qué y por qué en una línea>`. Nunca mezcles dos
-   pasos en un commit.
+   pasos en un commit. Si `.fabrica/config.json` tiene
+   `{"checkpoint_continuo": true}`, además guarda el trabajo INCOMPLETO
+   entre pasos: `node <RAIZ>/nucleo/checkpoint.mjs guardar "<paso en curso>"`
+   (commits WIP locales; /shipear los aplana antes del PR).
 5. **Sin ediciones ortogonales.** Si ves código feo fuera del alcance:
    `node <RAIZ>/nucleo/estado.mjs pendiente "refactor sugerido: ..."` y sigue.
 6. **Si algo contradice el plan** (el código real hace imposible el diseño),

@@ -14,6 +14,11 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/contexto` + checkpoint continuo**: commits WIP locales con el contexto
+  del sprint en el cuerpo (sobreviven crashes y cierres de sesión),
+  restauración completa de dónde ibas, y `aplanar` que consolida solo la
+  racha WIP antes del PR (bisect limpio). Modo continuo opcional: /construir
+  guarda checkpoint tras cada paso con `{"checkpoint_continuo": true}`.
 - **`/docs`**: documentación Diataxis en dos modos — actualizar (cruza el
   diff shipeado contra todos los docs y corrige el drift con hallazgos
   archivo:línea) y generar (investiga el código primero, elige el tipo

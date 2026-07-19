@@ -33,6 +33,7 @@ function responder(decision, razon) {
 // Patrones destructivos: [regex, descripción]. Cobertura Bash + PowerShell + cmd + SQL.
 const DESTRUCTIVOS = [
   [/\brm\s+(-[a-z]*\s+)*-[a-z]*[rf][a-z]*[rf][a-z]*\b/i, "rm recursivo/forzado"],
+  [/\b(ri|del|erase|Remove-Item)\b[^|;]*(-Recurse|-Force)\b/i, "Borrado recursivo/forzado en PowerShell"],
   [/\bRemove-Item\b[^|;]*-Recurse\b[^|;]*-Force\b/i, "Remove-Item -Recurse -Force"],
   [/\bRemove-Item\b[^|;]*-Force\b[^|;]*-Recurse\b/i, "Remove-Item -Force -Recurse"],
   [/\bgit\s+reset\s+--hard\b/i, "git reset --hard (descarta cambios locales)"],
@@ -56,9 +57,13 @@ try {
 
   // ── Protección 2: congelamiento de directorio ─────────────────────────────
   if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tool)) {
+    const objetivo = resolve(input.file_path ?? input.notebook_path ?? "");
+    if (objetivo.endsWith("guardia.json") || objetivo.endsWith("congelar.json")) {
+      responder("deny", "El agente no puede modificar su propia configuración de guardia directamente. El usuario debe hacerlo.");
+    }
+
     const congelar = leerJson(join(cwd, ".fabrica", "congelar.json"));
     if (congelar?.directorio) {
-      const objetivo = resolve(input.file_path ?? input.notebook_path ?? "");
       const permitido = resolve(cwd, congelar.directorio);
       const fabrica = resolve(cwd, ".fabrica");
       const dentro = (base) => objetivo === base || objetivo.startsWith(base + sep);

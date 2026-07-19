@@ -113,7 +113,25 @@ try {
   if (!/prof 1:[\s\S]*src\/b\.js/.test(r.stdout) || !/prof 2:[\s\S]*src\/a\.js/.test(r.stdout)) fallo(`grafo.mjs impacto: cierre transitivo incorrecto → ${r.stdout}`);
   r = correr("grafo.mjs", ["frescura"]);
   if (!/confiable/.test(r.stdout)) fallo(`grafo.mjs frescura recién generado debía ser confiable: ${r.stdout}`);
-  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa") || f.startsWith("grafo"))) ok("estado, memoria, mapa y grafo (impacto transitivo + frescura) funcionan");
+
+  // checkpoint.mjs: commit base → 2 WIP → aplanar consolida solo los WIP.
+  const gitTmp = (args) => spawnSync("git", ["-C", tmp, ...args], { encoding: "utf8" });
+  gitTmp(["init", "-q"]); gitTmp(["config", "user.name", "eval"]); gitTmp(["config", "user.email", "eval@repofibe"]);
+  gitTmp(["add", "-A"]); gitTmp(["commit", "-q", "-m", "base"]);
+  execFileSync(process.execPath, ["-e", "require('fs').writeFileSync(require('path').join(process.argv[1],'w1.txt'),'1')", tmp]);
+  r = correr("checkpoint.mjs", ["guardar", "primer avance"]);
+  if (!/Checkpoint local/.test(r.stdout)) fallo(`checkpoint.mjs guardar: ${r.stdout || r.stderr}`);
+  execFileSync(process.execPath, ["-e", "require('fs').writeFileSync(require('path').join(process.argv[1],'w2.txt'),'2')", tmp]);
+  correr("checkpoint.mjs", ["guardar", "segundo avance"]);
+  r = correr("checkpoint.mjs", ["restaurar"]);
+  if (!/primer avance/.test(r.stdout) || !/fabrica-contexto|SPRINT/.test(r.stdout)) fallo(`checkpoint.mjs restaurar no muestra contexto: ${r.stdout}`);
+  r = correr("checkpoint.mjs", ["aplanar", "feature completa"]);
+  if (!/Aplanados 2/.test(r.stdout)) fallo(`checkpoint.mjs aplanar: esperaba consolidar 2 WIP → ${r.stdout || r.stderr}`);
+  const titulos = gitTmp(["log", "--pretty=%s"]).stdout.trim().split("\n");
+  if (titulos[0] !== "feature completa" || titulos.some((t) => t.startsWith("WIP:")) || titulos.at(-1) !== "base") {
+    fallo(`checkpoint.mjs aplanar dejó historia incorrecta: ${titulos.join(" | ")}`);
+  }
+  if (!fallos.some((f) => f.startsWith("estado") || f.startsWith("memoria") || f.startsWith("mapa") || f.startsWith("grafo") || f.startsWith("checkpoint"))) ok("estado, memoria, mapa, grafo y checkpoint (WIP→aplanar sin tocar commits normales) funcionan");
 } finally { /* tmp se limpia al final */ }
 
 // ── 6. Funcional: guardia.mjs (protocolo de hook real por stdin) ─────────────
