@@ -61,7 +61,7 @@ documento es la hoja de ruta viva del loop de mejora: cada iteración toma
 | /land-and-deploy + /setup-deploy | ⏳ v0.3 | |
 | /canary (monitoreo post-deploy) | ⏳ v0.4 | |
 | /benchmark (Core Web Vitals) | ⏳ v0.4 | |
-| /codex (segunda opinión cross-modelo) | ⏳ v0.3 | Generalizar: cualquier CLI de otro modelo (codex, gemini) |
+| /codex (segunda opinión cross-modelo) | ✅ `/segunda-opinion` | **Mejora**: multi-motor (Codex → Gemini → Copilot) con fallback honesto etiquetado; redacción de secretos antes de enviar el diff a otro proveedor; análisis cruzado con verificación propia de hallazgos únicos |
 | /retro global multi-proyecto | ⏳ v0.4 | |
 
 ## Infraestructura

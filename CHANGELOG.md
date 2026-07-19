@@ -14,6 +14,11 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/segunda-opinion`**: revisión independiente del diff por otro modelo
+  (Codex → Gemini → Copilot CLI, con fallback honesto etiquetado cuando no
+  hay cross-modelo real). Redacta secretos antes de enviar el diff a otro
+  proveedor y cruza hallazgos contra /revisar: coincidencia = señal fuerte;
+  hallazgo único = se verifica leyendo el código antes de aceptarlo.
 - **Instalador con ownership por hash + migración `--adoptar`**: cada archivo
   instalado queda registrado con su sha256; el refresco jamás pisa archivos
   ajenos ni modificados por el usuario. `--adoptar` migra instalaciones
