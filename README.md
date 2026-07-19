@@ -3,7 +3,7 @@
 **Tu equipo de ingeniería virtual, en español.** Un CEO que reta el alcance,
 un eng manager que firma la arquitectura, una diseñadora que caza el AI slop,
 un staff engineer que encuentra los bugs que CI no ve, un QA con ojos, un CSO
-sin ruido y un release engineer que shipea el PR. 23 especialistas que
+sin ruido y un release engineer que shipea el PR. 29 especialistas que
 trabajan como trabaja un buen equipo: con proceso, con estado y con memoria.
 
 Inspirado en [gstack](https://github.com/garrytan/gstack) de Garry Tan —
@@ -113,19 +113,21 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 node evals/validar.mjs
 ```
 
-Tier 1, gratis, <5 segundos: valida frontmatter y convenciones de las 23
+Tier 1, gratis, <5 segundos: valida frontmatter y convenciones de las 29
 skills, manifiestos, hooks — y ejecuta de verdad `estado`, `memoria` y
 `guardia` contra un directorio temporal (incluidos los casos "rm -rf → ask",
 "--force-with-lease → silencio" y "edición fuera del congelado → deny").
 
 ## Hoja de ruta
 
-- **v0.2** — navegador propio con daemon persistente para `/qa`,
-  evals tier 2 (E2E), modo checkpoint continuo.
-- **v0.3** — skills de diseño generativo, `/docs` (Diataxis), segunda
-  opinión cross-modelo, evals tier 3 (LLM-juez).
-- **v0.4** — canary post-deploy, benchmark de rendimiento, memoria
-  compartida entre máquinas.
+- **v0.3** — daemon persistente de navegador para `/qa` y `/design-review`,
+  evals tier 2 (E2E con sesión real), defensa anti prompt-injection
+  (canary token + reglas de contenido no confiable).
+- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory),
+  `/scrape` + domain-skills, import de cookies del navegador real,
+  evals tier 3 (LLM-juez).
+- **v0.5** — benchmark de rendimiento (Core Web Vitals), memoria
+  compartida entre máquinas, `/pair-agent`, embeddings/busqueda semántica.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 

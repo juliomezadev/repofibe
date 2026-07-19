@@ -2,7 +2,7 @@
 
 Todas las novedades de repofibe, versión por versión.
 
-## Sin publicar
+## 0.2.0 — 2026-07-19
 
 - **`/design-review`**: auditoría de diseño EN VIVO sobre la app real
   corriendo, no un plan — usa `navegador.mjs` para capturar evidencia real
