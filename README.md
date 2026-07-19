@@ -129,10 +129,8 @@ atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
 
 ## Hoja de ruta
 
-- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory),
-  evals tier 3 (LLM-juez).
-- **v0.5** — memoria compartida entre máquinas, `/pair-agent`,
-  embeddings/búsqueda semántica.
+- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory).
+- **v0.5** — `/pair-agent`, embeddings/búsqueda semántica.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 

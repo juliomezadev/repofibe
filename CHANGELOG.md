@@ -22,6 +22,24 @@ Todas las novedades de repofibe, versión por versión.
   antes de crear el contexto de página, para que las cookies y localStorage
   del dominio estén disponibles desde la primera navegación.
 
+- **`nucleo/juez.mjs`**: eval tier 3 (LLM-juez) — invoca el CLI del LLM
+  disponible (`claude`, `gemini`) dinámicamente, cero SDK, cero keys
+  embebidas, mismo patrón que Playwright. Job MANUAL, no CI — el usuario
+  decide cuándo pagar. Rubricas estructuradas por skill (5 criterios
+  específicos, 0-2 puntos cada uno) para consistencia. Resuelve las dos
+  preguntas que el modelo anterior no pudo: cómo invocar un LLM sin
+  romper cero-deps (usa el CLI del proveedor, no SDK) y cómo lograr
+  consistencia (rubrica con criterios medibles, no evaluación libre).
+
+- **`nucleo/sync.mjs`**: sync de memoria entre máquinas via git. Los JSONL
+  de repofibe son append-only (memoria.mjs, dominio.mjs) — merge trivial
+  sin conflictos de contenido, solo appends concurrentes que git resuelve
+  automáticamente. Auth states se sincronizan como snapshots (reemplazo).
+  Escaneo de secretos (secretos.mjs) corre ANTES de push. Resuelve la
+  suposición "optimista" del modelo anterior: merge de JSONL entre
+  máquinas está pensado ahora — deduplicación por ID en el pull, no
+  concatenación naive.
+
 - **`/benchmark` + `nucleo/benchmark.mjs`**: Core Web Vitals reales (LCP,
   CLS, TTFB) sobre Chromium real, no estimados desde el código — inyecta
   un `PerformanceObserver` antes de navegar (`addInitScript`, el mismo
