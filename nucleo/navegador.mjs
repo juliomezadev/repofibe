@@ -26,6 +26,7 @@
 // texto{ref} (lee el texto visible), screenshot{archivo}, esperar{ms}.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 async function cargarPlaywright() {
   try {
@@ -41,12 +42,18 @@ async function cargarPlaywright() {
 
 // Parsea el texto de ariaSnapshot() en refs direccionables. Exportado para
 // poder probarlo con evidencia sin necesitar un browser real en el eval.
+// Regla compartida por parsearRefs y formatearSnapshot: DEBEN reconocer
+// exactamente las mismas líneas del snapshot, o los refs mostrados al
+// agente se desincronizan de los refs reales. Un solo regex, no dos
+// parecidos — la duplicación es justo lo que causa ese tipo de bug.
+const LINEA_ELEMENTO = /^\s*-\s*(\w+)\s+"([^"]*)"/;
+
 export function parsearRefs(snapshotTexto) {
   const refs = {};
   const conteo = {};
   let n = 0;
   for (const linea of snapshotTexto.split("\n")) {
-    const m = linea.match(/^\s*-\s*(\w+)\s+"([^"]*)"/);
+    const m = linea.match(LINEA_ELEMENTO);
     if (!m) continue;
     const [, role, name] = m;
     const clave = `${role}::${name}`;
@@ -58,13 +65,12 @@ export function parsearRefs(snapshotTexto) {
   return refs;
 }
 
-function formatearSnapshot(snapshotTexto, refs) {
-  const lineas = snapshotTexto.split("\n");
-  let i = 0;
-  return lineas.map((linea) => {
-    if (!/^\s*-\s*\w+\s+"/.test(linea)) return linea;
-    i++;
-    return `[e${i}] ${linea.trim()}`;
+function formatearSnapshot(snapshotTexto) {
+  let n = 0;
+  return snapshotTexto.split("\n").map((linea) => {
+    if (!LINEA_ELEMENTO.test(linea)) return linea;
+    n++;
+    return `[e${n}] ${linea.trim()}`;
   }).join("\n");
 }
 
@@ -94,7 +100,7 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
           case "snapshot": {
             const texto = await page.ariaSnapshot();
             refs = parsearRefs(texto);
-            resultados.push({ accion: "snapshot", ok: true, refs: Object.keys(refs).length, texto: formatearSnapshot(texto, refs), tiempoMs: Date.now() - inicio });
+            resultados.push({ accion: "snapshot", ok: true, refs: Object.keys(refs).length, texto: formatearSnapshot(texto), tiempoMs: Date.now() - inicio });
             break;
           }
           case "click": {
@@ -146,7 +152,7 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
   return resultados;
 }
 
-if (process.argv[1] && import.meta.url === (await import("node:url")).pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (cmd !== "ejecutar") {
     console.error('Uso: ejecutar \'[{"accion":"navegar","url":"..."}, ...]\' | ejecutar --archivo <script.json> | ejecutar --stdin');
