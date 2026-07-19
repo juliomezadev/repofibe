@@ -27,12 +27,22 @@ el reporte de bugs numerado. Por defecto: encontrar Y corregir.
 
 1. Detecta qué es la app: web (URL o dev server), API, CLI, librería.
 2. Elige los ojos según el host y lo instalado, en este orden:
-   - Web con gstack instalado → skill `/browse` de gstack (`$B`).
-   - Web sin gstack → Playwright: `npx playwright --version` para verificar;
-     si falta, propón `npm i -D playwright && npx playwright install chromium`.
-     Úsalo con scripts cortos de Node (goto → screenshot → assert).
+   - Web con `navegador.mjs` (código real con eval, ver `/grafo`-style):
+     `node <RAIZ>/nucleo/navegador.mjs ejecutar '[...]'` con un script de
+     acciones (`navegar`, `snapshot`, `click`, `escribir`, `texto`,
+     `screenshot`). Si Playwright no está instalado en el proyecto, el
+     propio comando lo dice — propón
+     `npm install playwright && npx playwright install chromium`.
+   - Web con gstack instalado (si el usuario ya lo tiene) → skill `/browse`
+     de gstack (`$B`), como alternativa si prefiere ese motor.
    - API → curl/fetch con casos de la matriz.
    - CLI → ejecutar el binario real con entradas de la matriz.
+
+   Flujo típico con `navegador.mjs`: un solo script de acciones por
+   verificación (navegar → snapshot → leer refs → click/escribir sobre el
+   ref correcto → screenshot) — un solo lanzamiento de Chromium, no uno por
+   acción. Los refs (`e1`, `e2`...) vienen del `snapshot` inmediatamente
+   anterior en el MISMO script; no son estables entre invocaciones.
 3. Levanta la app si hace falta (busca el comando en package.json/README) y
    VERIFICA que responde antes de declarar nada.
 

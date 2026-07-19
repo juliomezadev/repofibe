@@ -46,9 +46,9 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
-| Daemon Chromium persistente (~100ms/cmd) | ⏳ v0.2 | Diseño: HTTP local + token + refs de accesibilidad, en Node |
-| Sistema de refs (@e1) sobre árbol ARIA | ⏳ v0.2 | |
-| /qa con navegador | 🔶 | Hoy: /browse de gstack si existe, o Playwright directo (más lento, funcional) |
+| Daemon Chromium persistente (~100ms/cmd) | 🔶 | `navegador.mjs` v1 es script-por-invocación (un lanzamiento de Chromium por flujo completo), no daemon — decisión razonada en `.fabrica/problemas/navegador-propio.md`: construir un daemon sin evidencia de que el arranque sea el cuello de botella real es optimización prematura. Daemon queda para si esa evidencia aparece |
+| Sistema de refs (@e1) sobre árbol ARIA | ✅ `navegador.mjs` | `[IMPLEMENTADA]` propio, sobre la API pública `ariaSnapshot()` (la interna `_snapshotForAI` que usa el MCP oficial de Playwright no está expuesta). Desambigua elementos duplicados por índice — probado con dos botones idénticos |
+| /qa con navegador | ✅ `navegador.mjs` | `[IMPLEMENTADA]` motor primario de `/qa`: navegar/snapshot/click/escribir/texto/screenshot con eval end-to-end (Chromium real + servidor HTTP local) cuando Playwright está instalado, omisión clara si no. Playwright NUNCA se embebe como dependencia de repofibe — mismo patrón que graphify en `/grafo` |
 | Import de cookies del navegador real | ⏳ v0.3 | En Windows exige DPAPI — diseñar con cuidado |
 | Handoff a navegador visible (CAPTCHA/MFA) | ⏳ v0.3 | |
 | GStack Browser con branding/stealth | 🚫 | Valor marginal frente al costo; el daemon estándar basta |

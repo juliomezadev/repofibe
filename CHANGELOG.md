@@ -4,6 +4,26 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`nucleo/navegador.mjs`**: ojos reales para `/qa`, sin depender de
+  gstack. Script de acciones por invocación (`navegar`, `snapshot`,
+  `click`, `escribir`, `texto`, `screenshot`, `esperar`) sobre Chromium vía
+  Playwright, con sistema de refs PROPIO (`e1`, `e2`...) construido sobre
+  la API pública `ariaSnapshot()` — desambigua elementos duplicados por
+  índice de ocurrencia. Playwright se importa dinámicamente y nunca se
+  empaqueta como dependencia de repofibe (sigue siendo cero-deps); si no
+  está instalado, el error explica cómo instalarlo en el proyecto del
+  usuario. Decidido por `/complejo` con spike real (no especulación):
+  confirmó que Playwright funciona sin fricción en Windows con Node puro
+  (el bug de Bun documentado por gstack no aplica), y refutó dos supuestos
+  iniciales sobre la API de accesibilidad (`page.accessibility` fue
+  eliminada; `{ref:true}` no genera marcadores en la API pública). El
+  propio test funcional encontró un bug real antes de shipear: leer el
+  valor de un `<input>` con `innerText()` no lanza excepción, devuelve
+  string vacío en silencio — corregido ramificando por el `role` del
+  elemento en vez de depender de una excepción que nunca ocurre. v1 es
+  script-por-invocación, no daemon persistente — decisión razonada, no
+  omisión: sin evidencia de que el arranque de Chromium sea el cuello de
+  botella real, construir un daemon sería optimización prematura.
 - **Auditoría de documentación**: 5 skills (`contexto`, `desplegar`,
   `canario`, `segunda-opinion`, `pruebas-afectadas`) existían con código y
   evals pero no aparecían en `README.md` ni en `hooks/sesion.mjs` — ambos
