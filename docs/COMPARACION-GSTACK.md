@@ -62,7 +62,7 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | /design-consultation (sistema de diseño) | ✅ `/diseno` | `[GUIADA]` calibra contra ~75 sistemas de diseño reales (awesome-design-md) con lectura quirúrgica por sector/mood; deriva desde el producto, con porqués por token y prohibiciones anti-slop bloqueantes |
 | /design-shotgun (variantes + tablero + taste memory) | ⏳ v0.3 | Taste memory ya tiene hogar: memoria tipo `gusto` |
 | /design-html (Pretext) | 🚫 como tal | Pretext es apuesta propia de gstack; evaluaremos generación HTML de calidad sin esa dependencia |
-| /design-review en vivo | ⏳ v0.3 | Requiere navegador (v0.2) |
+| /design-review en vivo | ✅ `/design-review` | `[GUIADA]` sobre `navegador.mjs` `[IMPLEMENTADA]`. Audita la app REAL corriendo (no el plan): captura evidencia con Chromium real, mismas 6 dimensiones que `/plan-diseno`, y corrige con commits atómicos + screenshots antes/después como evidencia del fix, no descripción |
 
 ## Documentación, release y operación
 

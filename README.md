@@ -80,6 +80,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/plan-ing` | **Eng manager** | Flujo de datos ASCII, estados, casos borde, matriz de pruebas, modos de fallo. Veredicto: FIRMADO o DEVUELTO |
 | `/plan-diseno` | **Diseñadora senior** | Seis dimensiones 0-10 con "cómo se ve un 10". Detector de AI slop |
 | `/diseno` | **Design partner** | Entrevista + 3-5 referentes reales del catálogo awesome-design-md (lectura quirúrgica, jamás entero) → sistema de diseño derivado del producto con tokens concretos y prohibiciones anti-slop |
+| `/design-review` | **Diseñadora que mira de verdad** | Auditoría de diseño EN VIVO con `navegador.mjs`: captura la app real corriendo, mismas seis dimensiones que `/plan-diseno`, y CORRIGE con commits atómicos y screenshots antes/después |
 | `/autoplan` | **Pipeline** | Las tres revisiones en un comando: auto-decide lo objetivo (6 principios, marcados en el plan), pregunta solo el gusto |
 | `/construir` | **Implementador** | Ejecuta el plan firmado: test primero, checkpoints atómicos, cero ediciones ortogonales |
 | `/contexto` | **Checkpoints** | Commits WIP locales con el contexto del sprint en el cuerpo (sobreviven crashes y cierres de sesión); `aplanar` consolida solo la racha WIP antes del PR sin tocar commits normales |

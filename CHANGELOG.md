@@ -4,6 +4,15 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`/design-review`**: auditoría de diseño EN VIVO sobre la app real
+  corriendo, no un plan — usa `navegador.mjs` para capturar evidencia real
+  (screenshot + `ariaSnapshot`), audita las mismas 6 dimensiones que
+  `/plan-diseno` y el mismo detector de AI slop, y CORRIGE lo que
+  encuentra con commits atómicos y pares de screenshots antes/después como
+  evidencia del fix. La eval de drift de documentación (que verifica que
+  toda skill aparezca en README y en `sesion.mjs`) atrapó en el acto que
+  faltaba documentar esta skill al agregarla — funcionando como estaba
+  pensada.
 - **`nucleo/navegador.mjs`**: ojos reales para `/qa`, sin depender de
   gstack. Script de acciones por invocación (`navegar`, `snapshot`,
   `click`, `escribir`, `texto`, `screenshot`, `esperar`) sobre Chromium vía

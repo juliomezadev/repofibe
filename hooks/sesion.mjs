@@ -27,7 +27,7 @@ function listaSkills() {
     return nombres.map((n) => `/${n}`).join(", ");
   } catch {
     // Fallback estático solo si no se pudo leer disco (no debería pasar).
-    return "/fabrica, /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs, /contexto, /segunda-opinion, /pruebas-afectadas, /desplegar, /canario";
+    return "/fabrica, /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /design-review, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs, /contexto, /segunda-opinion, /pruebas-afectadas, /desplegar, /canario";
   }
 }
 
