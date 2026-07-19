@@ -14,6 +14,11 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **Instalador con ownership por hash + migración `--adoptar`**: cada archivo
+  instalado queda registrado con su sha256; el refresco jamás pisa archivos
+  ajenos ni modificados por el usuario. `--adoptar` migra instalaciones
+  anteriores al modelo (una vez, explícito) para que las actualizaciones
+  vuelvan a fluir. `--dry-run` disponible en todas las operaciones.
 - **`/contexto` + checkpoint continuo**: commits WIP locales con el contexto
   del sprint en el cuerpo (sobreviven crashes y cierres de sesión),
   restauración completa de dónde ibas, y `aplanar` que consolida solo la

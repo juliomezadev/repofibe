@@ -48,6 +48,7 @@ const hostPedido = flag("--host");
 const workspace = flag("--workspace");
 const quitar = args.includes("--quitar");
 const refrescar = args.includes("--refrescar");
+const adoptar = args.includes("--adoptar");
 const dryRun = args.includes("--dry-run");
 
 if (dryRun) {
@@ -457,6 +458,50 @@ const HOSTS = {
     },
   },
 };
+
+// adoptar: migración única para instalaciones anteriores al modelo de
+// ownership. Los archivos bajo rutas que repofibe creó (registro.rutas) pero
+// sin entrada de ownership quedan registrados con su hash ACTUAL de disco —
+// a partir de ahí el refresco puede actualizarlos normalmente. Los archivos
+// fuera de registro.rutas siguen intocables. Advertencia honesta: si el
+// usuario editó a mano uno de esos archivos instalados, la adopción lo
+// tratará como propio y el siguiente refresco lo sobreescribirá — por eso
+// este comando es explícito y nunca automático.
+if (adoptar) {
+  const registro = leerRegistro();
+  const listarArchivos = (ruta, salida) => {
+    const st = lstatSync(ruta);
+    if (st.isSymbolicLink()) return salida;
+    if (st.isFile()) { salida.push(ruta); return salida; }
+    if (st.isDirectory()) for (const e of readdirSync(ruta)) listarArchivos(join(ruta, e), salida);
+    return salida;
+  };
+  let adoptados = 0;
+  for (const base of registro.rutas) {
+    if (!existe(base)) continue;
+    for (const f of listarArchivos(resolve(base), [])) {
+      if (buscarArchivo(registro, f)) continue;
+      if (dryRun) { console.log("[DRY-RUN] adoptar", f); adoptados++; continue; }
+      registrarArchivo(registro, f, hashArchivo(f));
+      adoptados++;
+    }
+  }
+  let bloquesAdoptados = 0;
+  for (const ruta of registro.bloques) {
+    if (buscarBloque(registro, ruta) || !existe(ruta)) continue;
+    const st = lstatSync(ruta);
+    if (!st.isFile() || st.isSymbolicLink()) continue;
+    const actual = extraerBloque(readFileSync(ruta, "utf8"));
+    if (!actual) continue;
+    if (dryRun) { console.log("[DRY-RUN] adoptar bloque", ruta); bloquesAdoptados++; continue; }
+    registrarBloque(registro, ruta, hashTexto(actual.contenido), false);
+    bloquesAdoptados++;
+  }
+  if (!dryRun) guardarRegistro(registro);
+  console.log(`Adopción completa: ${adoptados} archivo(s) y ${bloquesAdoptados} bloque(s) ahora tienen ownership.`);
+  console.log("Siguiente paso: node nucleo/instalar.mjs --refrescar (las actualizaciones vuelven a fluir).");
+  process.exit(0);
+}
 
 // refrescar conserva el contrato anterior, pero ahora respeta ownership.
 if (refrescar) {
