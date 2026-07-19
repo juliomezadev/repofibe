@@ -4,6 +4,15 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`nucleo/salud.mjs`**: núcleo mecánico compartido de `/desplegar` y
+  `/canario` — detección de proveedor de deploy, medición HTTP real
+  (código, latencia, hash de contenido, timeout) y comparación pura contra
+  una línea base, con eval funcional que levanta un servidor HTTP local
+  real. Ambas skills pasan de GUIADA a núcleo IMPLEMENTADA + juicio GUIADA
+  (confirmar merge, decidir rollback siguen siendo del usuario). El propio
+  smoke test encontró y corrigió un bug de lógica real: un hash de
+  contenido distinto no es evidencia de regresión por sí solo — tratarlo
+  como tal habría producido falsos positivos en cada deploy legítimo.
 - **Evals de instalación por host** (`evals/seguridad/instalacion-hosts.mjs`):
   Claude Code (fallback determinista a copia de skills cuando la CLI
   `claude` no está en PATH, sin depender de si la máquina de CI la tiene) y

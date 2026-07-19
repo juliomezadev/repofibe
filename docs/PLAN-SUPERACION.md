@@ -56,11 +56,19 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
    además el bloque de reglas en `GEMINI.md` y los lanzadores de workflow.
    codex/cursor/opencode comparten la misma función `copiarSkills` que ya
    está cubierta indirectamente; sin eval dedicada por host todavía.
-7. 🔶 Navegador, deploy, canary y benchmark: `/desplegar` y `/canario` ya
-   existen como skills GUIADAS (instrucción para el modelo, sin código
-   ejecutable propio); navegador y benchmark siguen PLANEADOS. Ninguno de
-   estos entra en la categoría IMPLEMENTADA todavía — ver nota de
-   calibración abajo.
+7. 🔶 Navegador, deploy, canary y benchmark: `/desplegar` y `/canario` ahora
+   corren sobre `nucleo/salud.mjs` `[IMPLEMENTADA]` — detección de
+   proveedor, medición HTTP real (fetch + timeout + hash de contenido) y
+   comparación pura contra línea base, con eval funcional que levanta un
+   servidor HTTP local real (sin red externa). Lo que queda GUIADA es
+   exactamente lo que debe serlo: confirmar el merge, interpretar CI,
+   decidir si una regresión amerita rollback — juicio del usuario, no
+   código. El propio smoke test encontró un bug de lógica real antes de
+   integrarlo: la comparación trataba "contenido cambió + antes era error,
+   ahora 200" como regresión, cuando en realidad detectaba una
+   *recuperación*; y un hash distinto por sí solo no distingue deploy
+   legítimo de página de error — corregido, ese campo quedó informativo,
+   nunca decide el estado. Navegador propio y benchmark siguen PLANEADOS.
 
 **Nota de calibración (2026-07-18):** varias filas de `COMPARACION-GSTACK.md`
 marcadas ✅ corresponden a skills en Markdown (categoría GUIADA de este

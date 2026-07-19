@@ -69,8 +69,8 @@ reales en módulos que sí tenían evals pero vivían desconectadas del runner.
 | Capacidad de gstack | repofibe | Notas |
 |---|---|---|
 | /document-release + /document-generate (Diataxis) | ✅ `/docs` | `[GUIADA]` Una skill, dos modos (actualizar drift / generar desde cero). Todo comando documentado se EJECUTA antes de documentarse — los docs no pueden mentir |
-| /land-and-deploy + /setup-deploy | ✅ `/desplegar` | `[GUIADA]` Detección de proveedor (Vercel/Netlify/Fly/Pages/manual) + verificación de salud HTTP REAL post-deploy (regla 1: evidencia, no "debería estar arriba"). Confirmación explícita antes del merge — acción irreversible en sistema compartido |
-| /canary (monitoreo post-deploy) | ✅ `/canario` | `[GUIADA]` Línea base tomada por `/desplegar`, sondeo periódico (disponibilidad + latencia + contenido) contra esa línea base, regresión reportada con evidencia — rollback siempre requiere confirmación del usuario, nunca automático |
+| /land-and-deploy + /setup-deploy | ✅ `/desplegar` | Núcleo `[IMPLEMENTADA]` (`salud.mjs detectar/base/comparar`, eval con servidor HTTP local real); confirmar el merge e interpretar CI queda `[GUIADA]` — es juicio, no mecánica. Confirmación explícita antes del merge — acción irreversible en sistema compartido |
+| /canary (monitoreo post-deploy) | ✅ `/canario` | Núcleo `[IMPLEMENTADA]` (mismo `salud.mjs`: sondeo con exit code 0/1 y motivos concretos); decidir si una regresión amerita rollback queda `[GUIADA]`, nunca automático. El hash de contenido es informativo, no señal de regresión por sí solo (evita falsos positivos en deploys legítimos) |
 | /benchmark (Core Web Vitals) | ⏳ v0.4 | |
 | /codex (segunda opinión cross-modelo) | ✅ `/segunda-opinion` | `[GUIADA]` multi-motor (Codex → Gemini → Copilot) con fallback honesto etiquetado; redacción de secretos antes de enviar el diff a otro proveedor; análisis cruzado con verificación propia de hallazgos únicos |
 | /retro global multi-proyecto | ⏳ v0.4 | |

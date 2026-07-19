@@ -22,9 +22,11 @@ enterarte por un usuario enojado o por ti mismo.
 ## Paso 1 — Línea base
 
 Antes de vigilar, necesitas con qué comparar. Si `/desplegar` corrió en esta
-sesión, usa su medición de salud como línea base (código, tiempo de
-respuesta, tamaño de contenido). Si no, tómala tú mismo ahora contra
-`.fabrica/deploy.json` → `url_produccion`.
+sesión, ya existe `.fabrica/salud-base.json` (código real, no prosa). Si no:
+
+```
+node <RAIZ>/nucleo/salud.mjs base <url_produccion> [ruta_salud]
+```
 
 ## Paso 2 — La ventana de vigilancia
 
@@ -32,15 +34,25 @@ Pregunta al usuario (RECOMENDACIÓN: 15 minutos para cambios normales, 60
 para cambios de infraestructura/datos) o usa el default. Sondea a
 intervalos (cada 60-90s) durante la ventana:
 
-1. **Disponibilidad**: código de estado HTTP de `ruta_salud` (o `/`).
-   4xx/5xx nuevos que no estaban en la línea base = regresión.
-2. **Latencia**: tiempo de respuesta. Degradación sostenida >2x la línea
-   base (no un pico aislado — la red tiene ruido) = señal real.
-3. **Contenido**: si la línea base guardó un hash/tamaño del body, compara
-   — una página que de repente sirve un error 200 con HTML de error es
-   peor que un 500 porque nadie lo nota solo.
-4. **Errores de consola** (si hay navegador disponible vía `/qa`): opcional,
-   solo si el proyecto es web y el usuario lo pide — es más caro.
+```
+node <RAIZ>/nucleo/salud.mjs comparar <url_produccion> [ruta_salud]
+```
+
+Código de salida 0 = estable; 1 = regresión, con los motivos concretos
+(código HTTP degradado, o latencia >2x sostenida con salto absoluto real —
+no un pico aislado de red). Un pico aislado en un solo sondeo no es
+regresión: exige verlo repetirse en 2+ sondeos consecutivos antes de actuar.
+
+**Límite honesto sobre "contenido":** `salud.mjs` reporta si el hash del
+contenido cambió (`contenidoCambio`), pero eso es solo informativo — un
+deploy legítimo cambia el contenido todo el tiempo, y sin inspección
+semántica del body no hay forma confiable de distinguir "contenido nuevo
+válido" de "página de error servida con 200". No lo trates como señal de
+regresión por sí solo; si sospechas ese caso específico, verifícalo
+manualmente abriendo la URL o con `/qa`.
+
+**Errores de consola** (si hay navegador disponible vía `/qa`): opcional,
+solo si el proyecto es web y el usuario lo pide — es más caro.
 
 ## Paso 3 — Ante una regresión
 

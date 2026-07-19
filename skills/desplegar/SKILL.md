@@ -20,19 +20,23 @@ del merge — no asumas autorización de un "shipea" anterior.
 
 ## Paso 1 — Configuración (una vez por proyecto)
 
-Busca `.fabrica/deploy.json`. Si no existe, detéctala y confírmala con el
-usuario (RECOMENDACIÓN):
+Busca `.fabrica/deploy.json`. Si no existe:
+
+```
+node <RAIZ>/nucleo/salud.mjs detectar
+```
+
+(código real con eval — no adivines el proveedor a mano). Confirma con el
+usuario (RECOMENDACIÓN) y guarda:
 
 ```json
-{ "proveedor": "vercel|netlify|railway|render|fly|github-pages|manual",
+{ "proveedor": "vercel|netlify|fly|github-pages|manual",
   "url_produccion": "https://...",
   "ruta_salud": "/api/health" }
 ```
 
-Detección: `vercel.json`/`.vercel/` → Vercel; `netlify.toml` → Netlify;
-`fly.toml` → Fly.io; workflow con `actions/deploy-pages` → GitHub Pages;
-si nada calza, `proveedor: "manual"` y esta skill se limita a mergear +
-avisar (no puede verificar lo que no sabe dónde vive).
+Si el proveedor detectado es `manual`, esta skill se limita a mergear +
+avisar — no hay URL que verificar automáticamente.
 
 ## Paso 2 — Confirma y mergea
 
@@ -54,11 +58,23 @@ avisar (no puede verificar lo que no sabe dónde vive).
 
 ## Paso 4 — Verificación de salud real (regla 1: evidencia)
 
-Con `url_produccion` disponible: petición HTTP real a `ruta_salud` (o `/` si
-no hay ruta de salud), y compara contra el commit recién mergeado si el
-endpoint expone versión/commit. Sin esto, "desplegado" es una suposición,
-no un hecho. Reporta código de estado, tiempo de respuesta, y si el
-contenido cambió respecto a antes del deploy.
+Antes del deploy (justo después de mergear, mientras CI corre) toma la línea
+base del estado ANTERIOR si el proveedor lo permite, o mide el estado actual
+como referencia:
+
+```
+node <RAIZ>/nucleo/salud.mjs base <url_produccion> [ruta_salud]
+```
+
+Después de que el deploy termine, compara de verdad — no supongas:
+
+```
+node <RAIZ>/nucleo/salud.mjs comparar <url_produccion> [ruta_salud]
+```
+
+Sale con código 0 (`ESTABLE`) o 1 (`REGRESION`, con los motivos concretos:
+código HTTP degradado o latencia >2x sostenida). "Desplegado" sin esta
+comparación es una suposición, no un hecho.
 
 ## Al cerrar
 
@@ -66,7 +82,8 @@ contenido cambió respecto a antes del deploy.
 node <RAIZ>/nucleo/estado.mjs registrar desplegar "PR #<n> mergeado, <proveedor>, salud: <ok|fallo>"
 ```
 
-Si la verificación de salud falla, NO lo llames éxito — recomienda
+Si `salud.mjs comparar` sale con código 1, NO lo llames éxito — recomienda
 `/investigar` o rollback según la gravedad, y espera confirmación del
 usuario antes de cualquier acción de rollback (también irreversible).
-Cierra ofreciendo `/canario` para monitoreo post-deploy.
+Cierra ofreciendo `/canario` para monitoreo post-deploy (reutiliza la misma
+línea base que ya guardaste en `.fabrica/salud-base.json`).
