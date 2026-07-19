@@ -14,6 +14,10 @@ Todas las novedades de repofibe, versión por versión.
 - **Chequeo de actualización por sesión** en el hook SessionStart: throttled
   a una vez por hora, tolerante a red caída, solo para instalaciones vía
   clon git.
+- **`/canario`**: monitoreo post-deploy con línea base tomada por
+  `/desplegar` — sondea disponibilidad, latencia y contenido durante una
+  ventana configurable y reporta regresiones con evidencia. Rollback
+  siempre requiere confirmación explícita, nunca es automático.
 - **`/desplegar`**: de PR aprobado a verificado en producción — detecta el
   proveedor de deploy (Vercel/Netlify/Fly/GitHub Pages/manual), mergea con
   confirmación explícita (acción irreversible en sistema compartido), espera

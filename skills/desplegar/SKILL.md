@@ -69,4 +69,4 @@ node <RAIZ>/nucleo/estado.mjs registrar desplegar "PR #<n> mergeado, <proveedor>
 Si la verificación de salud falla, NO lo llames éxito — recomienda
 `/investigar` o rollback según la gravedad, y espera confirmación del
 usuario antes de cualquier acción de rollback (también irreversible).
-Cierra ofreciendo `/canario` para monitoreo post-deploy si existe.
+Cierra ofreciendo `/canario` para monitoreo post-deploy.
