@@ -4,6 +4,18 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`/benchmark` + `nucleo/benchmark.mjs`**: Core Web Vitals reales (LCP,
+  CLS, TTFB) sobre Chromium real, no estimados desde el código — inyecta
+  un `PerformanceObserver` antes de navegar (`addInitScript`, el mismo
+  cuidado de timing que exige medir LCP/CLS de verdad), lee TTFB/recursos/
+  bytes vía la Performance API estándar. Línea base + comparación pura con
+  umbrales relativos y absolutos combinados (evita que el ruido normal de
+  una sola medición dispare falsos positivos). Verificado con Chromium
+  real: el propio test encontró que `performance.getEntriesByType
+  ("resource")` no incluye el documento HTML principal (vive en la entrada
+  "navigation", aparte) — la aserción original asumía lo contrario;
+  corregida para reflejar la API real, con un subrecurso de prueba
+  agregado para confirmar el conteo con un caso no trivial.
 - **`/scrape` + `nucleo/dominio.mjs`**: extracción de datos reales de una
   página con `navegador.mjs` (navegar, snapshot, leer refs) — hereda
   automáticamente la defensa anti prompt-injection de `no-confiable.mjs`

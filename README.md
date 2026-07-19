@@ -93,6 +93,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/shipear` | **Release engineer** | Base al día, suite, cobertura, versión, changelog, docs, PR |
 | `/desplegar` | **Deploy verificado** | Mergea con confirmación explícita, espera CI, y verifica salud con una petición HTTP real a producción — nunca asume |
 | `/canario` | **Monitoreo post-deploy** | Sondea disponibilidad y latencia contra la línea base de `/desplegar`; rollback siempre requiere confirmación del usuario |
+| `/benchmark` | **Rendimiento real** | Core Web Vitals (LCP, CLS, TTFB) sobre Chromium real, línea base + comparación con motivos concretos — no adivina desde el código |
 | `/retro` | **Eng manager** | Datos reales de la semana → UNA mejora accionable |
 | `/docs` | **Technical writer** | Diataxis en dos modos: actualizar drift tras shipear / generar desde cero. Todo comando documentado se ejecuta antes — los docs no mienten |
 | `/memoria` | **Memoria** | Aprendizajes, trampas, decisiones y gustos que persisten entre sesiones |
@@ -130,8 +131,8 @@ atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
 
 - **v0.4** — `/design-shotgun` (variantes + tablero + taste memory),
   import de cookies del navegador real, evals tier 3 (LLM-juez).
-- **v0.5** — benchmark de rendimiento (Core Web Vitals), memoria
-  compartida entre máquinas, `/pair-agent`, embeddings/busqueda semántica.
+- **v0.5** — memoria compartida entre máquinas, `/pair-agent`,
+  embeddings/búsqueda semántica.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 
