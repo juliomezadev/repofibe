@@ -35,9 +35,12 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
    coincidencia de plurales (regex singular con `\b` final no matcheaba
    "vulnerabilidades"/"secretos") — corregido y cubierto por el mismo test
    que lo detectó.
-4. 🔶 Memoria y orientación: recuperación relevante (`memoria.mjs buscar`) e
-   impacto transitivo (`grafo.mjs impacto`) ya existen; falta selección
-   automática de pruebas afectadas por un cambio — **siguiente en la cola**.
+4. 🔶 Memoria y orientación: recuperación relevante (`memoria.mjs buscar`),
+   impacto transitivo (`grafo.mjs impacto`) y orientación estructural
+   (`mapa.mjs`) ya existen, todos `[IMPLEMENTADA]` en el sentido de este
+   documento. Falta selección automática de tests afectados por un cambio
+   (cruzar `git diff` con `grafo.mjs impacto` para filtrar la suite) —
+   **siguiente en la cola**.
 5. ✅ Legal colombiano: fuentes oficiales allowlisted, vigencia, fecha de
    consulta, incertidumbre calibrada y escalamiento a abogado. Contrato de
    respuesta obligatorio verificado en `evals/legal/validar.mjs`.
