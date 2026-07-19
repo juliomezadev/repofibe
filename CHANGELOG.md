@@ -4,6 +4,14 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **Auditoría de documentación**: 5 skills (`contexto`, `desplegar`,
+  `canario`, `segunda-opinion`, `pruebas-afectadas`) existían con código y
+  evals pero no aparecían en `README.md` ni en `hooks/sesion.mjs` — ambos
+  corregidos, y `sesion.mjs` dejó de copiar la lista a mano: ahora la genera
+  desde `skills/` en cada invocación, igual que `bloqueReglas()` en
+  `instalar.mjs`. `evals/validar.mjs` verifica ambos archivos contra el
+  disco real en cada corrida para que este drift no vuelva a pasar
+  desapercibido.
 - **`nucleo/secretos.mjs`**: redacción de secretos fail-closed compartida
   por `/segunda-opinion` (antes de mandar un diff a otro proveedor de IA) y
   `/spec` (antes de archivar una spec) — AWS, GitHub, GitLab, OpenAI, Slack,

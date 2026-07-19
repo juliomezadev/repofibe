@@ -82,10 +82,15 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/diseno` | **Design partner** | Entrevista + 3-5 referentes reales del catálogo awesome-design-md (lectura quirúrgica, jamás entero) → sistema de diseño derivado del producto con tokens concretos y prohibiciones anti-slop |
 | `/autoplan` | **Pipeline** | Las tres revisiones en un comando: auto-decide lo objetivo (6 principios, marcados en el plan), pregunta solo el gusto |
 | `/construir` | **Implementador** | Ejecuta el plan firmado: test primero, checkpoints atómicos, cero ediciones ortogonales |
+| `/contexto` | **Checkpoints** | Commits WIP locales con el contexto del sprint en el cuerpo (sobreviven crashes y cierres de sesión); `aplanar` consolida solo la racha WIP antes del PR sin tocar commits normales |
 | `/revisar` | **Staff engineer** | Siete cazadores de bugs de producción. Auto-corrige lo obvio, pregunta lo riesgoso |
+| `/segunda-opinion` | **Cross-modelo** | Revisión independiente por otro modelo (Codex/Gemini/Copilot) con redacción de secretos antes de enviar el diff y análisis cruzado contra `/revisar` |
 | `/investigar` | **Debugger** | Ley de Hierro: sin fix antes de causa raíz demostrada. Freno a los 3 intentos fallidos |
+| `/pruebas-afectadas` | **Selección de tests** | Cruza `git diff` con el grafo de impacto: qué pruebas correr sin la suite completa, y qué cambios quedaron sin ningún test que los alcance |
 | `/qa` | **QA con ojos** | Ejecuta la app de verdad (navegador/CLI/API), corrige, y cada fix trae test de regresión. `/qa solo-reporte` no toca código |
 | `/shipear` | **Release engineer** | Base al día, suite, cobertura, versión, changelog, docs, PR |
+| `/desplegar` | **Deploy verificado** | Mergea con confirmación explícita, espera CI, y verifica salud con una petición HTTP real a producción — nunca asume |
+| `/canario` | **Monitoreo post-deploy** | Sondea disponibilidad y latencia contra la línea base de `/desplegar`; rollback siempre requiere confirmación del usuario |
 | `/retro` | **Eng manager** | Datos reales de la semana → UNA mejora accionable |
 | `/docs` | **Technical writer** | Diataxis en dos modos: actualizar drift tras shipear / generar desde cero. Todo comando documentado se ejecuta antes — los docs no mienten |
 | `/memoria` | **Memoria** | Aprendizajes, trampas, decisiones y gustos que persisten entre sesiones |

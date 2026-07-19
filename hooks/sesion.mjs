@@ -4,11 +4,32 @@
 // proyecto. Así cualquier sesión nueva retoma el contexto sin que el usuario
 // tenga que repetirlo. Silencioso si no hay nada que decir. Fail-open.
 
-import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+
+// Lista de skills generada desde disco, no copiada a mano — el mismo
+// principio que bloqueReglas() en instalar.mjs. Copiar la lista a mano fue
+// exactamente la causa del drift real encontrado en la auditoría de
+// 2026-07-19 (5 skills existían y no aparecían aquí). Este hook solo corre
+// en instalación por plugin nativo (el modo copia no registra hooks.json),
+// así que la estructura del repo junto a este archivo siempre está intacta.
+function listaSkills() {
+  try {
+    const dirSkills = join(dirname(dirname(fileURLToPath(import.meta.url))), "skills");
+    const nombres = readdirSync(dirSkills, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(dirSkills, d.name, "SKILL.md")))
+      .map((d) => d.name)
+      .sort();
+    if (!nombres.length) throw new Error("sin skills en disco");
+    return nombres.map((n) => `/${n}`).join(", ");
+  } catch {
+    // Fallback estático solo si no se pudo leer disco (no debería pasar).
+    return "/fabrica, /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs, /contexto, /segunda-opinion, /pruebas-afectadas, /desplegar, /canario";
+  }
+}
 
 // Chequeo de actualización: throttled a 1/hora, tolerante a fallos de red,
 // silencioso salvo que de verdad haya versión nueva. Solo aplica si la raíz
@@ -88,7 +109,7 @@ try {
   if (partes.length) {
     process.stdout.write(
       "[repofibe] Contexto de la fábrica:\n" + partes.join("\n") +
-      "\nSkills: /fabrica (orquestador), /razonar, /complejo, /ubicar, /grafo, /oficina, /spec, /plan-ceo, /plan-ing, /plan-diseno, /diseno, /autoplan, /construir, /revisar, /investigar, /qa, /shipear, /retro, /memoria, /seguridad, /guardian, /legal, /docs, /contexto, /segunda-opinion, /desplegar, /canario.\n"
+      `\nSkills: ${listaSkills()}.\n`
     );
   }
   process.exit(0);

@@ -103,3 +103,24 @@ Antes de usar “mejor que gstack”, comparar 20 tareas equivalentes y registra
 Objetivo de release: cero hallazgos P1, desinstalación sin borrar archivos
 ajenos, cobertura de los flujos críticos y resultados iguales o mejores en la
 matriz comparativa.
+
+## Auditoría 2026-07-19 (post punto 7)
+
+Con los 7 puntos del orden de ejecución cerrados, primera pasada de
+auditoría general en vez de saltar directo al ítem grande siguiente
+(navegador propio — genuino océano, no cabe en una iteración). Hallazgo
+real: 5 skills (`contexto`, `desplegar`, `canario`, `segunda-opinion`,
+`pruebas-afectadas`) existían con código y evals pero no aparecían en
+`README.md` ni en la lista de `hooks/sesion.mjs` — invisibles en la UX y en
+el contexto inyectado al abrir sesión, a pesar de que cada commit
+individual actualizó `CHANGELOG.md` y `COMPARACION-GSTACK.md`. Corregido en README, y en `sesion.mjs` corregido por CAUSA RAÍZ, no solo
+detección: la lista dejó de copiarse a mano y ahora se genera con
+`readdirSync(skills/)` en cada invocación del hook, exactamente el mismo
+principio que ya usaba `bloqueReglas()` en `instalar.mjs` — verificado de
+punta a punta simulando el hook por stdin real (no solo leyendo el código),
+con las 28 skills apareciendo correctamente. `evals/validar.mjs` ahora
+tiene dos redes: una verifica que README documente cada skill (aquí sí solo
+detección, porque el README es prosa que un humano/agente escribe, no algo
+generable), y otra verifica que `sesion.mjs` liste dinámicamente — probado
+que ambas detectan el drift de verdad (se rompió `README.md` a propósito,
+falló, se restauró, pasó).

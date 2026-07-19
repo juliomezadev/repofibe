@@ -43,6 +43,22 @@ for (const s of skills) {
 }
 if (!fallos.length) ok(`${skills.length} skills con frontmatter, disparadores y referencias válidas`);
 
+// ── 1b. Cada skill debe estar documentada en README.md y en el hook de sesión.
+// Sin esto, una skill nueva puede quedar invisible en la UX (README) o en el
+// contexto que se inyecta al abrir sesión — el drift real encontrado en la
+// auditoría de 2026-07-19 (5 skills existían y no aparecían en ningún lado).
+{
+  const readme = readFileSync(join(RAIZ, "README.md"), "utf8");
+  const sesion = readFileSync(join(RAIZ, "hooks", "sesion.mjs"), "utf8");
+  const enReadme = new Set([...readme.matchAll(/`\/([a-z-]+)`/g)].map((m) => m[1]));
+  const enSesion = new Set([...sesion.matchAll(/\/([a-z-]+)/g)].map((m) => m[1]));
+  const faltanReadme = skills.filter((s) => !enReadme.has(s));
+  const faltanSesion = skills.filter((s) => !enSesion.has(s));
+  if (faltanReadme.length) fallo(`README.md no documenta: ${faltanReadme.join(", ")}`);
+  if (faltanSesion.length) fallo(`hooks/sesion.mjs no lista: ${faltanSesion.join(", ")}`);
+  if (!faltanReadme.length && !faltanSesion.length) ok("todas las skills están documentadas en README.md y listadas en sesion.mjs");
+}
+
 // ── 2. Manifiestos y versión ─────────────────────────────────────────────────
 try {
   const plugin = JSON.parse(readFileSync(join(RAIZ, ".claude-plugin", "plugin.json"), "utf8"));
@@ -172,6 +188,18 @@ if (g?.permissionDecision !== "deny") fallo(`guardia congelada: edición fuera d
 g = probarGuardia({ tool_name: "Edit", tool_input: { file_path: join(tmp, "src", "dentro.txt") }, cwd: tmp });
 if (g !== null) fallo(`guardia congelada: edición dentro de src/ no debía bloquearse`);
 if (!fallos.some((f) => f.startsWith("guardia"))) ok("guardia.mjs: destructivos→ask, seguros→silencio, congelamiento→deny/permitir");
+
+// ── 6b. Funcional: sesion.mjs — la lista de skills se genera desde disco ────
+// Fija en rojo el drift real de 2026-07-19: la lista vivía copiada a mano y
+// se desactualizó en cuanto se agregaron skills nuevas.
+{
+  const r = spawnSync(process.execPath, [join(RAIZ, "hooks", "sesion.mjs")], {
+    cwd: tmp, input: JSON.stringify({ cwd: tmp }), encoding: "utf8",
+  });
+  const faltantes = skills.filter((s) => !r.stdout.includes(`/${s}`));
+  if (faltantes.length) fallo(`sesion.mjs no lista dinámicamente: ${faltantes.join(", ")} (¿volvió a copiarse a mano?)`);
+  else ok(`sesion.mjs lista las ${skills.length} skills reales de disco, no una copia a mano`);
+}
 
 rmSync(tmp, { recursive: true, force: true });
 
