@@ -23,17 +23,33 @@ import { pathToFileURL } from "node:url";
 
 const RAIZ = import.meta.dirname;
 
+// En Windows los CLIs de npm (claude, gemini) son shims .cmd que
+// execFileSync NO puede ejecutar sin shell (ENOENT/EINVAL) — por eso la
+// detección fallaba en Windows aunque el CLI estuviera instalado. shell:true
+// resuelve el .cmd. Para no abrir superficie de inyección: los ARGS son
+// siempre literales fijos (--version, -p, ...) y el contenido no confiable
+// (el prompt, que incluye output de skills) va por STDIN, jamás como arg.
+function correrCLI(comando, args, opciones = {}) {
+  if (process.platform === "win32") {
+    // shell:true resuelve los shims .cmd. Se pasa como STRING único (no array
+    // de args) para evitar la deprecación DEP0190 — seguro porque los args
+    // son literales fijos sin datos del usuario (el prompt va por stdin).
+    return execFileSync(`${comando} ${args.join(" ")}`, { encoding: "utf8", shell: true, ...opciones });
+  }
+  return execFileSync(comando, args, { encoding: "utf8", ...opciones });
+}
+
 const PROVEEDORES = {
   claude: {
     comando: "claude",
     args: ["-p", "--output-format", "json"],
-    detectar: () => { try { execFileSync("claude", ["--version"]); return true; } catch { return false; } },
+    detectar: () => { try { correrCLI("claude", ["--version"], { stdio: "ignore" }); return true; } catch { return false; } },
     formatoRespuesta: (out) => { try { const j = JSON.parse(out); return j.result || j; } catch { return out; } },
   },
   gemini: {
     comando: "gemini",
     args: ["-p"],
-    detectar: () => { try { execFileSync("gemini", ["--version"]); return true; } catch { return false; } },
+    detectar: () => { try { correrCLI("gemini", ["--version"], { stdio: "ignore" }); return true; } catch { return false; } },
     formatoRespuesta: (out) => out,
   },
 };
@@ -131,8 +147,9 @@ async function evaluar(skill, output, proveedorPreferido) {
     '{"veredicto": "pasa|pasa_con_reservas|falla", "puntos": <number 0-10>, "criterios": [{"criterio": <number>, "puntos": <0-2>, "motivo": "<1 línea>"}, ...], "observaciones": "<1 línea general>"}',
   ].join("\n");
 
-  const args = [...cfg.args, prompt];
-  const raw = execFileSync(cfg.comando, args, { encoding: "utf8", timeout: 120000, maxBuffer: 1024 * 1024 });
+  // El prompt (contiene output de skills, potencialmente no confiable) va
+  // por STDIN, no como argumento — así shell:true en Windows no lo interpreta.
+  const raw = correrCLI(cfg.comando, cfg.args, { input: prompt, timeout: 120000, maxBuffer: 1024 * 1024 });
   const texto = cfg.formatoRespuesta(raw);
 
   // Intentar parsear JSON de la respuesta

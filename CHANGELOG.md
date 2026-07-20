@@ -2,8 +2,16 @@
 
 Todas las novedades de repofibe, versión por versión.
 
-## Sin publicar
+## 0.3.0 — 2026-07-19
 
+- **Fix (Windows, tier 3)**: `juez.mjs` no detectaba NINGÚN proveedor de LLM
+  en Windows aunque estuviera instalado — `execFileSync("claude")` da ENOENT
+  y `"claude.cmd"` da EINVAL (los shims `.cmd` no corren sin shell). El
+  LLM-juez estaba completamente roto en Windows. Corregido con `shell:true`
+  para resolver el `.cmd`, pasando el comando como string único (evita la
+  deprecación DEP0190) y el prompt no confiable por STDIN (nunca como arg de
+  shell → sin superficie de inyección). Verificado en vivo: ahora detecta el
+  `claude` CLI instalado.
 - **`/autenticar`**: skill que hace alcanzable la sesión autenticada
   (`cookies.mjs` + acción `perfil` de `navegador.mjs`) — login una vez en
   Chromium visible, storageState reinyectado en `/qa`/`/scrape`/
