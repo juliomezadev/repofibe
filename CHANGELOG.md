@@ -4,6 +4,28 @@ Todas las novedades de repofibe, versión por versión.
 
 ## Sin publicar
 
+- **`/autenticar`**: skill que hace alcanzable la sesión autenticada
+  (`cookies.mjs` + acción `perfil` de `navegador.mjs`) — login una vez en
+  Chromium visible, storageState reinyectado en `/qa`/`/scrape`/
+  `/design-review`. Antes el módulo existía pero ninguna skill lo exponía.
+- **Auditoría de las "piezas difíciles" (2026-07-19)**: al revisar
+  `sync.mjs` se encontraron y corrigieron 3 bugs reales que su eval no veía
+  porque **reimplementaba** la lógica en el test en vez de llamar al código:
+  (1) `appendFileSync` usado sin importar → `pull` crasheaba en el primer
+  merge; (2) el escáner de secretos leía `resultado.encontrados` (no existe;
+  es `.hallazgos`) → NUNCA redactaba, credenciales al repo privado en texto
+  plano — bug de seguridad; (3) dedup por `id` duplicaba cada entrada de
+  `memoria.jsonl` (que no tiene `id`) en cada pull. Se extrajo `mergeJsonl`
+  (dedup por línea, idempotente) y se reescribió la eval para probar el
+  código real, bloqueando los 3 bugs. `juez.mjs`: 1 fix de doc (el CLI de
+  gemini es `@google/gemini-cli`, no `@anthropic-ai`).
+- **Spike DPAPI (documentado, no shippeado)**: se verificó con evidencia que
+  leer el almacén cifrado real del navegador es FACTIBLE (`node:sqlite` en
+  Node 24, DPAPI vía PowerShell, AES-256-GCM v10 en Node) — refutando 3 de
+  los 4 supuestos de bloqueo del modelo anterior. El 4º (Chrome mantiene lock
+  exclusivo del archivo mientras corre) se confirmó como el bloqueo real. Se
+  eligió deliberadamente el enfoque storageState (cross-platform, sin lock,
+  menos invasivo). Detalle: `.fabrica/problemas/cookies-navegador.md`.
 - **`cookies.mjs`**: contexto autenticado para navegador.mjs, sin leer el
   almacén cifrado del navegador real (sin SQLite, sin DPAPI, sin riesgos
   dual-use). Usa Playwright's `storageState`: el usuario autentica UNA vez
@@ -32,13 +54,12 @@ Todas las novedades de repofibe, versión por versión.
   consistencia (rubrica con criterios medibles, no evaluación libre).
 
 - **`nucleo/sync.mjs`**: sync de memoria entre máquinas via git. Los JSONL
-  de repofibe son append-only (memoria.mjs, dominio.mjs) — merge trivial
-  sin conflictos de contenido, solo appends concurrentes que git resuelve
-  automáticamente. Auth states se sincronizan como snapshots (reemplazo).
-  Escaneo de secretos (secretos.mjs) corre ANTES de push. Resuelve la
-  suposición "optimista" del modelo anterior: merge de JSONL entre
-  máquinas está pensado ahora — deduplicación por ID en el pull, no
-  concatenación naive.
+  de repofibe son append-only (memoria.mjs, dominio.mjs) — `mergeJsonl` hace
+  merge con dedup por LÍNEA completa (idempotente, sin duplicar). Auth
+  states se sincronizan como snapshots (reemplazo). Escaneo de secretos
+  (secretos.mjs) corre ANTES de push. Resuelve la suposición "optimista"
+  del modelo anterior sobre el merge de JSONL. (Ver la nota de auditoría
+  arriba: la primera versión tenía 3 bugs, corregidos.)
 
 - **`/benchmark` + `nucleo/benchmark.mjs`**: Core Web Vitals reales (LCP,
   CLS, TTFB) sobre Chromium real, no estimados desde el código — inyecta

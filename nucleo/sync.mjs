@@ -20,7 +20,7 @@
 // que credenciales o tokens se publiquen accidentalmente.
 
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, rmSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
@@ -43,6 +43,28 @@ function guardarConfig(config) {
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
+// Merge append-only de dos JSONL. Dedup por LÍNEA COMPLETA, no por campo
+// `id`: memoria.jsonl no tiene `id` (solo dominio-notas.jsonl lo tiene), así
+// que dedup por id duplicaría cada entrada de memoria en cada pull. La línea
+// completa es el identificador correcto para logs append-only escritos por
+// la misma herramienta. Devuelve cuántas líneas nuevas se agregaron.
+export function mergeJsonl(destPath, srcPath) {
+  if (!existsSync(srcPath)) return 0;
+  const remotas = readFileSync(srcPath, "utf8").split("\n").filter(Boolean);
+  if (!existsSync(destPath)) {
+    writeFileSync(destPath, remotas.length ? remotas.join("\n") + "\n" : "");
+    return remotas.length;
+  }
+  const locales = new Set(readFileSync(destPath, "utf8").split("\n").filter(Boolean));
+  const nuevas = remotas.filter((l) => !locales.has(l));
+  if (nuevas.length) {
+    const actual = readFileSync(destPath, "utf8");
+    const sep = actual === "" || actual.endsWith("\n") ? "" : "\n";
+    appendFileSync(destPath, sep + nuevas.join("\n") + "\n");
+  }
+  return nuevas.length;
+}
+
 async function escanearSecretos(dirFabrica) {
   const { redactar } = await import("./secretos.mjs");
   // Escanear archivos JSONL en .fabrica/
@@ -53,9 +75,9 @@ async function escanearSecretos(dirFabrica) {
     if (!existsSync(ruta)) continue;
     const contenido = readFileSync(ruta, "utf8");
     const resultado = redactar(contenido);
-    if (resultado.encontrados > 0) {
+    if (resultado.hallazgos.length > 0) {
       writeFileSync(ruta, resultado.texto);
-      encontrados += resultado.encontrados;
+      encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
     }
   }
   // Escanear auth states (cookies)
@@ -66,9 +88,9 @@ async function escanearSecretos(dirFabrica) {
       const ruta = join(authDir, arch);
       const contenido = readFileSync(ruta, "utf8");
       const resultado = redactar(contenido);
-      if (resultado.encontrados > 0) {
+      if (resultado.hallazgos.length > 0) {
         writeFileSync(ruta, resultado.texto);
-        encontrados += resultado.encontrados;
+        encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
       }
     }
   }
@@ -79,8 +101,6 @@ function readdirSyncList(dir) {
   try { return readdirSync(dir); }
   catch { return []; }
 }
-
-import { readdirSync } from "node:fs";
 
 async function push(dirFabrica) {
   const config = cargarConfig();
@@ -152,22 +172,8 @@ async function pull(dirFabrica) {
   }
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
-    const src = join(syncFabrica, arch);
-    const dest = join(dirFabrica, arch);
-    if (!existsSync(src)) continue;
-    if (!existsSync(dest)) {
-      writeFileSync(dest, readFileSync(src, "utf8"));
-      continue;
-    }
-    // APPEND-ONLY merge: leer líneas locales y remotas, unir sin duplicados
-    const localLines = readFileSync(dest, "utf8").split("\n").filter(Boolean);
-    const remoteLines = readFileSync(src, "utf8").split("\n").filter(Boolean);
-    const localIds = new Set(localLines.map((l) => { try { return JSON.parse(l).id; } catch { return null; } }).filter(Boolean));
-    const nuevas = remoteLines.filter((l) => { try { const id = JSON.parse(l).id; return !localIds.has(id); } catch { return true; } });
-    if (nuevas.length > 0) {
-      appendFileSync(dest, "\n" + nuevas.join("\n"));
-      console.log(`${arch}: ${nuevas.length} entradas nuevas sincronizadas.`);
-    }
+    const n = mergeJsonl(join(dirFabrica, arch), join(syncFabrica, arch));
+    if (n > 0) console.log(`${arch}: ${n} entradas nuevas sincronizadas.`);
   }
 
   // Auth states (reemplazar, no append — son snapshots, no logs)

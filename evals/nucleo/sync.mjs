@@ -1,60 +1,77 @@
 #!/usr/bin/env node
-// evals/nucleo/sync.mjs — eval funcional de sync.mjs (merge append-only + config)
+// evals/nucleo/sync.mjs — eval funcional de sync.mjs.
 //
-// El escaneo de secretos ya tiene eval propia (evals/nucleo/secretos.mjs).
-// Aquí solo se prueba el merge de JSONL y la gestión de config — la
-// integración real (push/pull con repo git) es job manual del usuario.
+// Prueba el CÓDIGO REAL de sync.mjs (mergeJsonl, escanearSecretos), no una
+// reimplementación. La versión anterior de esta eval copiaba la lógica de
+// merge dentro del test y por eso NO detectó tres bugs reales (auditados y
+// corregidos 2026-07-19):
+//   1. appendFileSync usado sin importar → pull crasheaba en el primer merge.
+//   2. escanearSecretos leía resultado.encontrados (no existe; es .hallazgos)
+//      → el escáner de secretos NUNCA redactaba antes de push (no-op de
+//      seguridad: credenciales al repo privado en texto plano).
+//   3. dedup por `id` duplicaba cada entrada de memoria.jsonl (no tiene id).
+// La integración real (push/pull con git) sigue siendo job manual del usuario.
 
 import { strictEqual, ok } from "node:assert";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { cargarConfig } from "../../nucleo/sync.mjs";
+import { mergeJsonl, escanearSecretos } from "../../nucleo/sync.mjs";
 
 const TEMP = mkdtempSync(join(tmpdir(), "repofibe-sync-eval-"));
 
-function probarMergeAppendOnly() {
-  // Simular JSONL local (3 entradas con IDs)
-  const local = [
-    { id: "a1", tipo: "aprendizaje", texto: "local 1", fecha: "2026-07-19" },
-    { id: "a2", tipo: "aprendizaje", texto: "local 2", fecha: "2026-07-19" },
-    { id: "a3", tipo: "decision", texto: "local 3", fecha: "2026-07-19" },
-  ];
+function lineas(p) { return readFileSync(p, "utf8").split("\n").filter(Boolean); }
 
-  // Simular JSONL remoto (4 entradas: 2 duplicadas, 2 nuevas)
-  const remoto = [
-    { id: "a1", tipo: "aprendizaje", texto: "local 1", fecha: "2026-07-19" },
-    { id: "a2", tipo: "aprendizaje", texto: "local 2", fecha: "2026-07-19" },
-    { id: "b1", tipo: "eureka", texto: "remoto nuevo 1", fecha: "2026-07-18" },
-    { id: "b2", tipo: "error", texto: "remoto nuevo 2", fecha: "2026-07-18" },
-  ];
-
-  // Merge append-only: deduplicar por ID
-  const localIds = new Set(local.map((l) => l.id));
-  const nuevas = remoto.filter((l) => !localIds.has(l.id));
-  strictEqual(nuevas.length, 2, "solo 2 entradas remotas debían ser nuevas (b1, b2)");
-  ok(nuevas.find((l) => l.id === "b1"), "b1 debía estar en las nuevas");
-  ok(nuevas.find((l) => l.id === "b2"), "b2 debía estar en las nuevas");
-
-  // Simular merge real: local + nuevas = resultado
-  const merged = [...local, ...nuevas];
-  strictEqual(merged.length, 5, "merge debía tener 5 entradas (3 local + 2 nuevas)");
-  const mergedIds = new Set(merged.map((l) => l.id));
-  strictEqual(mergedIds.size, 5, "no debía haber IDs duplicados en el merge");
+async function probarMergeConId() {
+  // dominio-notas.jsonl: entradas CON id. Remoto trae 2 duplicadas + 2 nuevas.
+  const dest = join(TEMP, "dominio-notas.jsonl");
+  const src = join(TEMP, "dominio-remoto.jsonl");
+  const mk = (arr) => arr.map((o) => JSON.stringify(o)).join("\n") + "\n";
+  writeFileSync(dest, mk([{ id: "a1", texto: "l1" }, { id: "a2", texto: "l2" }, { id: "a3", texto: "l3" }]));
+  writeFileSync(src, mk([{ id: "a1", texto: "l1" }, { id: "a2", texto: "l2" }, { id: "b1", texto: "r1" }, { id: "b2", texto: "r2" }]));
+  const n = mergeJsonl(dest, src); // ejercita appendFileSync de verdad (BUG 1)
+  strictEqual(n, 2, "solo 2 líneas remotas nuevas (b1,b2)");
+  strictEqual(lineas(dest).length, 5, "3 locales + 2 nuevas = 5, sin duplicados");
+  console.log("ok: mergeJsonl con id — appendFileSync real, dedup por línea, 2 nuevas de 4");
 }
 
-function probarConfig() {
-  // Sin archivo de config → null
-  const result = cargarConfig();
-  ok(result === null || result === undefined, "sin config file, cargarConfig debía retornar null/undefined");
+async function probarMergeSinId() {
+  // memoria.jsonl: entradas SIN id (fecha/tipo/texto). El dedup DEBE ser por
+  // línea completa, no por id — si fuera por id, todas serían "nuevas" y se
+  // duplicarían (BUG 3). Reaplicar el mismo remoto dos veces no debe crecer.
+  const dest = join(TEMP, "memoria.jsonl");
+  const src = join(TEMP, "memoria-remoto.jsonl");
+  const mk = (arr) => arr.map((o) => JSON.stringify(o)).join("\n") + "\n";
+  writeFileSync(dest, mk([{ fecha: "2026-07-19", tipo: "nota", texto: "local" }]));
+  writeFileSync(src, mk([
+    { fecha: "2026-07-19", tipo: "nota", texto: "local" },      // duplicada exacta
+    { fecha: "2026-07-18", tipo: "eureka", texto: "remota" },   // nueva
+  ]));
+  strictEqual(mergeJsonl(dest, src), 1, "solo la línea nueva (la duplicada exacta no cuenta)");
+  strictEqual(mergeJsonl(dest, src), 0, "re-merge del mismo remoto no agrega nada (idempotente)");
+  strictEqual(lineas(dest).length, 2, "1 local + 1 remota = 2, sin duplicar pese a no tener id");
+  console.log("ok: mergeJsonl sin id (memoria) — dedup por línea, idempotente, no duplica");
+}
+
+async function probarEscaneoSecretos() {
+  // BUG 2: el escáner debe redactar de verdad antes de push.
+  const fab = join(TEMP, ".fabrica");
+  mkdirSync(fab, { recursive: true });
+  const token = "ghp_" + "1234567890abcdefghijklmnopqrstuvwxyzAB"; // forma real, valor ficticio
+  writeFileSync(join(fab, "memoria.jsonl"), JSON.stringify({ tipo: "nota", texto: "token: " + token }) + "\n");
+  const n = await escanearSecretos(fab);
+  const despues = readFileSync(join(fab, "memoria.jsonl"), "utf8");
+  ok(n > 0, "el escáner debía contar al menos 1 secreto redactado (no NaN, no 0)");
+  ok(!despues.includes(token), "el token NO debe seguir en el archivo tras escanear");
+  ok(despues.includes("REDACTADO"), "debe quedar la marca REDACTADO");
+  console.log("ok: escanearSecretos redacta de verdad antes de push (BUG 2 de seguridad, cubierto)");
 }
 
 try {
-  probarMergeAppendOnly();
-  console.log("ok: merge append-only deduplica por ID (2 nuevas de 4 remotas, 0 duplicados en resultado)");
-  probarConfig();
-  console.log("ok: cargarConfig retorna null sin archivo de config");
-  console.log("Sync: merge append-only y config verificados; push/pull real es job manual con repo privado del usuario.");
+  await probarMergeConId();
+  await probarMergeSinId();
+  await probarEscaneoSecretos();
+  console.log("Sync: mergeJsonl (con/sin id, idempotente) y escanearSecretos verificados sobre el código real; push/pull con git sigue siendo job manual.");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });
 }

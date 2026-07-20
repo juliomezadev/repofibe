@@ -90,6 +90,7 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/pruebas-afectadas` | **Selección de tests** | Cruza `git diff` con el grafo de impacto: qué pruebas correr sin la suite completa, y qué cambios quedaron sin ningún test que los alcance |
 | `/qa` | **QA con ojos** | Ejecuta la app de verdad (navegador/CLI/API), corrige, y cada fix trae test de regresión. `/qa solo-reporte` no toca código |
 | `/scrape` | **Extracción de datos reales** | Navega y extrae con `navegador.mjs`; guarda patrones reutilizables por dominio con `dominio.mjs` (cuarentena → activa tras 3 usos, igual que domain-skills de gstack) |
+| `/autenticar` | **Sesión autenticada** | Login una vez en Chromium visible → `storageState` de Playwright guardado por dominio y reinyectado en `/qa`/`/scrape`/`/design-review`. No lee el almacén cifrado del navegador (cross-platform, sin lock, sin DPAPI) |
 | `/shipear` | **Release engineer** | Base al día, suite, cobertura, versión, changelog, docs, PR |
 | `/desplegar` | **Deploy verificado** | Mergea con confirmación explícita, espera CI, y verifica salud con una petición HTTP real a producción — nunca asume |
 | `/canario` | **Monitoreo post-deploy** | Sondea disponibilidad y latencia contra la línea base de `/desplegar`; rollback siempre requiere confirmación del usuario |

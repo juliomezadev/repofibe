@@ -108,7 +108,7 @@ async function evaluar(skill, output, proveedorPreferido) {
     throw new Error(
       "No se encontró ningún proveedor de LLM instalado. Instala uno:\n" +
       "  claude CLI: npm install -g @anthropic-ai/claude-code\n" +
-      "  gemini CLI: npm install -g @anthropic-ai/gemini-cli\n" +
+      "  gemini CLI: npm install -g @google/gemini-cli\n" +
       "(repofibe no embebe SDK ni keys — usa el CLI que ya tienes)."
     );
   }
