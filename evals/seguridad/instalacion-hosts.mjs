@@ -66,6 +66,11 @@ function probarHostClaude() {
     const skills = readdirSync(destino).filter((n) => n.startsWith("repofibe-"));
     assert.ok(skills.length >= 20, `se esperaban 20+ skills repofibe-*, hay ${skills.length}`);
     assert.ok(existsSync(join(destino, "repofibe-fabrica", "SKILL.md")), "falta repofibe-fabrica/SKILL.md");
+    // El name interno del SKILL.md instalado DEBE llevar el prefijo, para no
+    // colisionar con otras suites (p.ej. la `qa` de gstack). El repo fuente
+    // conserva el nombre corto.
+    assert.match(readFileSync(join(destino, "repofibe-fabrica", "SKILL.md"), "utf8"), /^name:\s*repofibe-fabrica$/m,
+      "el name interno de la skill instalada debe ser repofibe-fabrica (evita colisión con otras suites)");
 
     // Idempotencia: refrescar sin cambios no debe fallar ni duplicar.
     r = ejecutar(["--refrescar"], hogar);

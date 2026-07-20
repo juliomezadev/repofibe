@@ -2,6 +2,25 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## 0.3.1 — 2026-07-19
+
+- **Fix (colisión de nombres con otras suites)**: si tenías gstack instalado,
+  escribir `qa` invocaba la `qa` de gstack (en inglés), no la de repofibe —
+  porque ambas declaraban `name: qa` en su frontmatter. Ahora el instalador
+  reescribe el `name:` interno de cada skill a su nombre con prefijo
+  (`repofibe-qa`, `repofibe-revisar`, …) SOLO en la copia instalada (el repo
+  fuente conserva el nombre corto, legible). Así las skills de repofibe se
+  invocan como `repofibe-<algo>` y nunca chocan con `qa`/`retro`/`benchmark`
+  de gstack. Verificado por eval de instalación por host.
+- **Fix (`--adoptar` re-sincroniza ownership obsoleto)**: al migrar los
+  nombres, se encontró que `--adoptar` saltaba archivos que ya tenían entrada
+  en el registro aunque el hash guardado fuera OBSOLETO (no coincidía con el
+  disco). Eso dejaba las actualizaciones bloqueadas para siempre: el refresco
+  creía que el usuario había editado el archivo y lo preservaba. Ahora
+  `--adoptar` re-sincroniza el ownership al hash real del disco, destrabando
+  las actualizaciones. Encontrado con un diagnóstico de hashes (registro
+  489b… vs disco b3d9…), no adivinado.
+
 ## 0.3.0 — 2026-07-19
 
 - **Fix (Windows, tier 3)**: `juez.mjs` no detectaba NINGÚN proveedor de LLM

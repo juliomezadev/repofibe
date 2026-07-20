@@ -280,6 +280,16 @@ function skills() {
     .map((d) => d.name);
 }
 
+// Reescribe el `name:` del frontmatter a `<prefijo><skill>` (p.ej.
+// repofibe-qa). El repo fuente conserva el nombre corto (legible, y así la
+// eval tier-1 `name === carpeta` sigue pasando); SOLO la copia instalada
+// lleva el prefijo, para que no colisione con otras suites (gstack también
+// define `qa`, `retro`, `benchmark`). Idempotente: no vuelve a prefijar.
+function prefijarNombreSkill(contenido, prefijo, skill) {
+  return contenido.replace(/^name:\s*(\S+)/m, (m, nombre) =>
+    nombre.startsWith(prefijo) ? m : `name: ${prefijo}${skill}`);
+}
+
 function copiarSkills(registro, destinoBase, prefijo = "repofibe-") {
   const base = resolve(destinoBase);
   asegurarDirectorio(registro, base);
@@ -287,9 +297,14 @@ function copiarSkills(registro, destinoBase, prefijo = "repofibe-") {
   for (const s of skills()) {
     const destino = join(base, prefijo + s);
     copiarArbol(registro, join(RAIZ, "skills", s), destino);
+    // El SKILL.md se reescribe con el nombre prefijado (la copia de
+    // copiarArbol trae el nombre corto; esto la sobrescribe con ownership
+    // por hash del contenido transformado, así el refresco no la ve "editada").
+    const fuenteMd = readFileSync(join(RAIZ, "skills", s, "SKILL.md"), "utf8");
+    escribirArchivoSeguro(registro, join(destino, "SKILL.md"), prefijarNombreSkill(fuenteMd, prefijo, s));
     anotar(registro, destino);
   }
-  console.log(`  ${skills().length} skills -> ${base}`);
+  console.log(`  ${skills().length} skills (nombre interno con prefijo "${prefijo}") -> ${base}`);
 }
 
 function extraerBloque(texto) {
@@ -481,13 +496,21 @@ if (adoptar) {
     if (st.isDirectory()) for (const e of readdirSync(ruta)) listarArchivos(join(ruta, e), salida);
     return salida;
   };
+  // Re-SINCRONIZA el ownership al hash real de disco: no solo adopta los
+  // archivos sin entrada, también reescribe las entradas OBSOLETAS (cuyo hash
+  // registrado ya no coincide con el disco). Sin esto, una entrada vieja hace
+  // que el refresco crea que "el usuario editó" el archivo y lo preserve, y
+  // las actualizaciones quedan bloqueadas para siempre. Estas rutas son las
+  // carpetas de repofibe (repofibe-*), no archivos del usuario.
   let adoptados = 0;
   for (const base of registro.rutas) {
     if (!existe(base)) continue;
     for (const f of listarArchivos(resolve(base), [])) {
-      if (buscarArchivo(registro, f)) continue;
-      if (dryRun) { console.log("[DRY-RUN] adoptar", f); adoptados++; continue; }
-      registrarArchivo(registro, f, hashArchivo(f));
+      const actual = hashArchivo(f);
+      const previo = buscarArchivo(registro, f);
+      if (previo && previo.sha256 === actual) continue; // ya sincronizado
+      if (dryRun) { console.log("[DRY-RUN] adoptar/re-sincronizar", f); adoptados++; continue; }
+      registrarArchivo(registro, f, actual);
       adoptados++;
     }
   }
