@@ -2,6 +2,13 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.4.0] — 2026-07-21
+### Añadido
+- **Observabilidad Determinista**: Telemetría integrada cero-dependencias usando `AsyncLocalStorage` y `node:events`. 
+- **Máquina del Tiempo (CLI)**: Nuevo comando `node nucleo/traza.mjs inspeccionar <id>` que renderiza un árbol ASCII colorido de la ejecución y latencias.
+- **Anti-Fugas**: Hook de gracia (`process.on('uncaughtException')` y `SIGINT`) que fuerza volcados síncronos del buffer de trazas para no perder datos forenses en caso de crash del agente.
+- **Instrumentación Automática**: Los comandos pesados (daemon de navegador y vectores de memoria) ahora están envueltos en `withTrace`, inyectando contexto invisiblemente sin contaminar la base del código.
+
 ## 0.3.3 — 2026-07-21
 
 - **Feature (Arquitectura Núcleo)**: Refactor profundo integrando las pruebas de concepto (Spikes) a producción:

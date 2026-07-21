@@ -207,13 +207,27 @@ rmSync(tmp, { recursive: true, force: true });
 // Viven aparte porque tienen su propio arnés (assert de Node, hogares
 // temporales); se agregan aquí para que ningún push quede en verde con una
 // de estas en rojo — el punto ciego que motivó esta integración.
-for (const suite of ["inteligencia/validar.mjs", "legal/validar.mjs", "seguridad/instalacion-segura.mjs", "seguridad/instalacion-hosts.mjs", "nucleo/salud.mjs", "nucleo/secretos.mjs", "nucleo/navegador.mjs", "nucleo/no-confiable.mjs", "nucleo/dominio.mjs", "nucleo/benchmark.mjs", "nucleo/cookies.mjs", "nucleo/juez.mjs", "nucleo/sync.mjs"]) {
-  const ruta = join(RAIZ, "evals", suite);
-  if (!existsSync(ruta)) continue;
+async function ejecutarPrueba(rutaRel, nombre) {
+  const ruta = join(RAIZ, rutaRel);
+  if (!existsSync(ruta)) return;
   const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: 30000 });
-  if (r.status !== 0) fallo(`evals/${suite}: ${(r.stderr || r.stdout).trim().split("\n").slice(0, 4).join(" | ")}`);
-  else ok(`evals/${suite}: ${r.stdout.trim().split("\n").at(-1)}`);
+  if (r.status !== 0) fallo(`${rutaRel}: ${(r.stderr || r.stdout).trim().split("\n").slice(0, 4).join(" | ")}`);
+  else ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
 }
+
+await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
+await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
+await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
+await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts");
+await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
+await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
+await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
+await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
+await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
+await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
+await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
+await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
+await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
 if (fallos.length) {

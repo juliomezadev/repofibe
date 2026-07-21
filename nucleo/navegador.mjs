@@ -29,6 +29,7 @@ import { join } from "node:path";
 import { detectarInyeccion } from "./no-confiable.mjs";
 import { cargar as cargarAuth, dirAuth as dirAuthBase } from "./cookies.mjs";
 import readline from "readline";
+import { withTrace } from "./traza.mjs";
 
 async function cargarPlaywright() {
   try {
@@ -77,7 +78,7 @@ async function localizador(page, refs, ref) {
 }
 
 // Ejecutor unificado (try/catch a nivel de comando para modo daemon seguro)
-async function ejecutarComandoInseguro(accion, page, browser, refs, dirBase) {
+async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase) {
   const inicio = Date.now();
   switch (accion.accion) {
     case "perfil": {
@@ -133,6 +134,11 @@ async function ejecutarComandoInseguro(accion, page, browser, refs, dirBase) {
       return { accion: accion.accion, ok: false, error: `acción desconocida: ${accion.accion}` };
   }
 }
+
+const ejecutarComandoInseguro = async (accion, page, browser, refs, dirBase) => {
+  const fn = withTrace(`Navegador: ${accion.accion}`, ejecutarComandoInseguroBase);
+  return fn(accion, page, browser, refs, dirBase);
+};
 
 export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
   const { chromium } = await cargarPlaywright();

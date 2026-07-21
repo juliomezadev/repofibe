@@ -6,6 +6,7 @@
 import { readFileSync, appendFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { withTrace } from "./traza.mjs";
 
 const TIPOS = ["aprendizaje", "decision", "gusto", "error", "eureka"];
 const LOCAL = join(process.cwd(), ".fabrica", "memoria.jsonl");
@@ -56,7 +57,7 @@ function cosineSimilarity(vecA, vecB) {
 }
 
 let pipelineCache = null;
-async function obtenerExtractor() {
+async function obtenerExtractorBase() {
   if (pipelineCache) return pipelineCache;
   try {
     const { pipeline } = await import(/* @vite-ignore */ "@xenova/transformers");
@@ -74,8 +75,9 @@ async function obtenerExtractor() {
     return null;
   }
 }
+const obtenerExtractor = withTrace("Memoria: Cargar ONNX", obtenerExtractorBase);
 
-async function procesarBuscador() {
+async function procesarBuscadorBase() {
   const [cmd, ...args] = process.argv.slice(2);
   const esGlobal = args.includes("--global");
   const limpios = args.filter((a) => a !== "--global");
@@ -185,6 +187,13 @@ async function procesarBuscador() {
       process.exit(1);
   }
 }
+
+const procesarBuscador = async () => {
+  const args = process.argv.slice(2).filter((a) => a !== "--global");
+  const cmd = args.length > 0 ? args[0] : "desconocido";
+  const fn = withTrace(`Memoria: ${cmd}`, procesarBuscadorBase);
+  return fn();
+};
 
 procesarBuscador().catch(e => {
   console.error("Error fatal en memoria:", e);
