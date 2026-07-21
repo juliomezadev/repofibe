@@ -2,6 +2,13 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## 0.3.3 — 2026-07-21
+
+- **Feature (Arquitectura Núcleo)**: Refactor profundo integrando las pruebas de concepto (Spikes) a producción:
+  - `memoria.mjs`: Incorpora motor semántico ONNX opcional (carga dinámica lazy). Vectores separados en `.vectores.jsonl`, generación asíncrona en lote (*batching*) para mitigar latencia, y combinación de búsqueda textual + semántica con Reciprocal Rank Fusion (RRF).
+  - `navegador.mjs`: Implementado modo `daemon` persistente. Soporta una sesión viva vía IPC JSON estricto (uso de `msgId`), prevención de *Race Conditions* con un semáforo de promesas asíncronas, y suicidio nativo anti-fugas de RAM si la fábrica se colapsa.
+  - Limpieza total de andamios (`spike-*` borrados).
+
 ## 0.3.2 — 2026-07-21
 
 - **Feature (Spikes de Auditoría GStack)**: Completada la Fase 6 de investigación técnica para superar a GStack.
