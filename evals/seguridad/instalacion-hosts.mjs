@@ -34,12 +34,14 @@ function pathSinClaude() {
   return partes.join(sep);
 }
 
-function ejecutar(args, hogar, { sinClaude = false } = {}) {
+function ejecutar(args, hogar, { sinClaude = false, appdata, localappdata } = {}) {
   const entorno = {
     HOME: hogar,
     USERPROFILE: hogar,
     HOMEDRIVE: hogar.slice(0, 2),
     HOMEPATH: hogar.slice(2),
+    APPDATA: appdata || join(hogar, "AppData", "Roaming"),
+    LOCALAPPDATA: localappdata || join(hogar, "AppData", "Local"),
     PATH: sinClaude ? pathSinClaude() : process.env.PATH,
   };
   return spawnSync(process.execPath, [INSTALADOR, ...args], { env: entorno, encoding: "utf8" });
@@ -130,6 +132,56 @@ function probarHostAntigravity() {
   }
 }
 
+function probarHostCursor() {
+  const temporal = mkdtempSync(join(tmpdir(), "repofibe-host-cursor-"));
+  const hogar = join(temporal, "hogar");
+  const appdata = join(temporal, "appdata");
+  const localappdata = join(temporal, "localappdata");
+  try {
+    mkdirSync(join(hogar, ".cursor"), { recursive: true });
+
+    let r = ejecutar(["--host", "cursor"], hogar, { appdata, localappdata });
+    exigirExito(r, "instalación cursor");
+
+    const destino = join(hogar, ".cursor", "skills");
+    assert.ok(existsSync(destino), "no se crearon skills en ~/.cursor/skills");
+    const skills = readdirSync(destino).filter((n) => n.startsWith("repofibe-"));
+    assert.ok(skills.length >= 20, `se esperaban 20+ skills repofibe-*, hay ${skills.length}`);
+
+    r = ejecutar(["--quitar"], hogar, { appdata, localappdata });
+    exigirExito(r, "desinstalación cursor");
+    assert.ok(!existsSync(destino) || readdirSync(destino).filter((n) => n.startsWith("repofibe-")).length === 0, "--quitar debió limpiar las skills de cursor");
+  } finally {
+    try { spawnSync(process.platform === "win32" ? "cmd" : "rm", process.platform === "win32" ? ["/c", "rmdir", "/s", "/q", temporal] : ["-rf", temporal]); } catch {}
+  }
+}
+
+function probarHostCodex() {
+  const temporal = mkdtempSync(join(tmpdir(), "repofibe-host-codex-"));
+  const hogar = join(temporal, "hogar");
+  const appdata = join(temporal, "appdata");
+  const localappdata = join(temporal, "localappdata");
+  try {
+    mkdirSync(join(hogar, ".codex"), { recursive: true });
+
+    let r = ejecutar(["--host", "codex"], hogar, { appdata, localappdata });
+    exigirExito(r, "instalación codex");
+
+    const destino = join(hogar, ".codex", "skills");
+    assert.ok(existsSync(destino), "no se crearon skills en ~/.codex/skills");
+    const skills = readdirSync(destino).filter((n) => n.startsWith("repofibe-"));
+    assert.ok(skills.length >= 20, `se esperaban 20+ skills repofibe-*, hay ${skills.length}`);
+
+    r = ejecutar(["--quitar"], hogar, { appdata, localappdata });
+    exigirExito(r, "desinstalación codex");
+    assert.ok(!existsSync(destino) || readdirSync(destino).filter((n) => n.startsWith("repofibe-")).length === 0, "--quitar debió limpiar las skills de codex");
+  } finally {
+    try { spawnSync(process.platform === "win32" ? "cmd" : "rm", process.platform === "win32" ? ["/c", "rmdir", "/s", "/q", temporal] : ["-rf", temporal]); } catch {}
+  }
+}
+
 probarHostClaude();
 probarHostAntigravity();
-console.log("Instalación por host: claude (fallback determinista) y antigravity (bloque + lanzadores) verificados.");
+probarHostCursor();
+probarHostCodex();
+console.log("Instalación por host: claude (fallback determinista), antigravity (bloque + lanzadores), cursor y codex verificados.");

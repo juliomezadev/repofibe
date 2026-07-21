@@ -2,6 +2,12 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## 0.3.2 — 2026-07-21
+
+- **Feature (Spikes de Auditoría GStack)**: Completada la Fase 6 de investigación técnica para superar a GStack.
+  - Aislamiento estricto de variables de entorno (`APPDATA` y `LOCALAPPDATA`) añadido a `instalacion-hosts.mjs`, logrando paridad de pruebas (evals) para Cursor y Codex sin tocar la máquina del usuario.
+  - Creados spikes aislados en `/nucleo` para un Daemon de Chromium persistente (`spike-daemon.mjs`) y para embeddings ONNX locales (`spike-embeddings.mjs`). Esto valida la viabilidad técnica de agentes cooperativos interactivos y memoria semántica sin bases de datos externas.
+
 ## 0.3.1 — 2026-07-19
 
 - **Fix (colisión de nombres con otras suites)**: si tenías gstack instalado,
