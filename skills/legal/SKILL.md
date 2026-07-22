@@ -1,14 +1,15 @@
 ---
 name: legal
 description: |
-  Asesor legal de la fábrica con razonamiento en derecho colombiano:
-  protección de datos (Ley 1581/2012, SIC), delitos informáticos (Ley
-  1273/2009), comercio electrónico (Ley 527/1999), consumidor (Ley
-  1480/2011) y software como obra (Ley 23/1982). No presupone adaptadores ni
-  integraciones automáticas con plugins legales. Úsala cuando el usuario diga
-  "¿esto es legal en Colombia?", "revisa los términos", "¿necesito política
-  de datos?", "habeas data", "¿puedo scrapear esto?", "contrato de software".
-  (repofibe)
+  Asesor legal de la fábrica en derecho colombiano: derecho LABORAL en todos
+  sus ámbitos (contratos, jornada, prestaciones, terminación e
+  indemnizaciones, estabilidad reforzada, seguridad social), protección de
+  datos (Ley 1581/2012), delitos informáticos (Ley 1273/2009), comercio
+  electrónico (Ley 527/1999), consumidor (Ley 1480/2011) y software como obra
+  (Ley 23/1982). Lee y analiza documentos y pregunta los hechos antes de
+  asesorar — nunca adivina cifras ni normas. Úsala cuando el usuario diga
+  "revisa mi contrato laboral", "¿me liquidaron bien?", "me despidieron",
+  "¿esto es legal en Colombia?", "revisa los términos". (repofibe)
 ---
 
 **Arranque obligatorio:** localiza la raíz de repofibe — sube dos niveles desde
@@ -55,6 +56,10 @@ sola la vigencia ni el contenido de una afirmación.
 | Dirección de Impuestos y Aduanas Nacionales | `dian.gov.co` | Facturación electrónica y obligaciones de la DIAN |
 | Dirección Nacional de Derecho de Autor | `derechodeautor.gov.co` | Derecho de autor y registro ante la DNDA |
 | Comunidad Andina | `comunidadandina.org` | Instrumentos andinos ya incluidos en el mapa |
+| Ministerio del Trabajo | `mintrabajo.gov.co` | Normativa/conceptos laborales, inspección del trabajo |
+| Función Pública (gestor normativo) | `funcionpublica.gov.co` | Texto y vigencia del CST y normas laborales |
+| Corte Suprema (Sala Laboral) | `cortesuprema.gov.co` | Jurisprudencia laboral |
+| DANE | `dane.gov.co` | IPC y datos oficiales para cálculos/reajustes |
 
 Reglas para cada fuente:
 
@@ -128,6 +133,15 @@ ni agregues normas nuevas de memoria:
 | Consumidor en e-commerce | Ley 1480/2011 (Estatuto del Consumidor) | Derecho de retracto (5 días hábiles en ventas a distancia), reversión de pagos, información clara de precios, garantía legal. Aplica a cualquier app que venda en Colombia |
 | Software como obra | Ley 23/1982 + Decisión Andina 351/1993 | El software es obra protegida por derecho de autor (no patentable como tal en CO). Registro opcional ante la DNDA. Obra por encargo/laboral: pactar cesión POR ESCRITO — sin pacto, el desarrollador retiene derechos |
 | Transferencia internacional de datos | Ley 1581/2012 + circulares SIC | Enviar datos a servidores fuera de CO exige nivel adecuado de protección o autorización del titular — relevante para todo SaaS con hosting extranjero |
+| Derecho laboral (todos los ámbitos) | Código Sustantivo del Trabajo + leyes laborales | Índice extenso en `laboral.md` (misma carpeta). Las cifras (SMLMV, auxilios, recargos, topes) cambian cada año → verificar el valor vigente, jamás de memoria |
+
+## Casos laborales y lectura de documentos
+Si el caso es LABORAL o el usuario aporta un documento (contrato,
+liquidación, carta de terminación, desprendible), **carga y sigue
+`laboral.md`** (misma carpeta): trae el intake obligatorio (qué preguntar
+antes de asesorar), el mapa de ámbitos, el análisis cláusula por cláusula con
+banderas rojas, y la regla de cero adivinanza sobre cifras laborales. Lee el
+documento COMPLETO antes de opinar.
 
 ## El método (razonamiento jurídico con el playbook)
 

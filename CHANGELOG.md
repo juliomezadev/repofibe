@@ -2,6 +2,31 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.5.2] — 2026-07-19
+### Añadido — `/legal` ahora experto en derecho laboral colombiano
+- **Derecho laboral en todos sus ámbitos** (`skills/legal/laboral.md`, nueva
+  referencia que la skill carga cuando el caso es laboral): contratos y
+  tipos, primacía de la realidad (prestación de servicios vs contrato laboral
+  encubierto), jornada y recargos, salario y prestaciones, terminación e
+  indemnizaciones, estabilidad reforzada (embarazo/incapacidad/fuero),
+  seguridad social, acoso (Ley 1010/2006), colectivo/sindical, teletrabajo y
+  desconexión. Todo como índice de orientación — con verificación obligatoria
+  en fuente oficial antes de afirmar artículos, montos o plazos.
+- **Lectura y análisis de documentos**: método cláusula por cláusula para
+  contratos, liquidaciones, cartas de terminación y desprendibles, con
+  banderas rojas laborales (salario bajo el mínimo, subordinación encubierta,
+  renuncia a derechos irrenunciables, falta de afiliación, etc.). Lee el
+  documento completo antes de opinar.
+- **Intake obligatorio por preguntas**: batería de 9 hechos del caso
+  (relación, tipo/duración, salario, jornada, prestaciones, conflicto,
+  situación protegida, documentos, tiempos) — entre más sepa del caso, mejor
+  asesora; lo desconocido se marca como supuesto, nunca se inventa.
+- **Regla de oro laboral: cero adivinanza sobre cifras.** SMLMV, auxilio de
+  transporte, recargos, topes e indemnizaciones cambian cada año → se
+  verifican para el año del caso en fuente oficial, jamás de memoria.
+- **Fuentes laborales en la allowlist**: Ministerio del Trabajo, Función
+  Pública (texto del CST), Corte Suprema (Sala Laboral), DANE (IPC).
+
 ## [0.5.1] — 2026-07-19
 ### Corregido (auditoría del trabajo v0.4–v0.5)
 - **CRÍTICO — corrupción de memoria en el merge driver**: `gitMerge3Way`
