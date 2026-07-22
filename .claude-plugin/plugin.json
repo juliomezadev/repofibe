@@ -1,6 +1,6 @@
 {
   "name": "repofibe",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "La Fábrica: tu equipo de ingeniería virtual en español. Piensa, planea, construye, revisa, prueba, shipea y reflexiona — con guardias deterministas por hooks, estado de sprint explícito y memoria persistente. Funciona en Claude Code, Antigravity y cualquier IDE con Agent Skills.",
   "author": {
     "name": "Brayan Sánchez"

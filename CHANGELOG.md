@@ -2,6 +2,13 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.4.1] — 2026-07-21
+### Añadido
+- **Skill `/qaonline` & Engine `qaonline.mjs`**: Motor ejecutable y skill para QA en vivo en producción/staging con soporte para entornos autenticados.
+- **Self-Healing Auth (Auto-Curación)**: Detección automática de redirecciones a `/login` a mitad de ejecuciones pesadas, corrida de macro `autoLogin` robótica y exportación de nuevo `storageState` en caliente sin colgar procesos en CI.
+- **Soporte de LocalStorage en Daemon**: Extensión del comando `perfil` e inclusión del nuevo comando `exportarPerfil` en `navegador.mjs` para preservar JWTs guardados en `localStorage`.
+- **Evidencia Determinista en Markdown**: Generación automática de reportes en `.fabrica/evidencia/qaonline_<traceId>.md` tabulando respuestas, capturas y trazas.
+
 ## [0.4.0] — 2026-07-21
 ### Añadido
 - **Observabilidad Determinista**: Telemetría integrada cero-dependencias usando `AsyncLocalStorage` y `node:events`. 
