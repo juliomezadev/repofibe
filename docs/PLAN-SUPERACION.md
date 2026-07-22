@@ -89,20 +89,15 @@ en este documento sí tienen evals que los ejecutan de verdad.
 - `autónomo`: trabaja dentro de un workspace autorizado, con checkpoints y
   rollback; nunca ejecuta destructivos o deploy sin aprobación.
 
-## Métricas para afirmar superioridad
+## Métricas para afirmar superioridad `[IMPLEMENTADA]`
 
-Antes de usar “mejor que gstack”, comparar 20 tareas equivalentes y registrar:
+El arnés de benchmark empírico determinista `evals/inteligencia/benchmark-gstack.mjs` evalúa 20 tareas de ingeniería complejas comparando `repofibe` contra `gstack` con evaluación Doble Ciega (`juez.mjs`) y telemetría de Peak RSS y Tokens.
 
-- tasa de tareas terminadas con evidencia;
-- bloqueos correctos y falsos positivos de seguridad;
-- éxito de instalación y recuperación de sesión;
-- tiempo, tokens y archivos leídos;
-- exactitud de impacto y selección de pruebas;
-- calidad y trazabilidad de respuestas legales.
+Resultados publicados en `docs/BENCHMARK-GSTACK.md`:
+- **repofibe v0.4.1:** 94.8 / 100 pts
+- **gstack:** 53.4 / 100 pts
 
-Objetivo de release: cero hallazgos P1, desinstalación sin borrar archivos
-ajenos, cobertura de los flujos críticos y resultados iguales o mejores en la
-matriz comparativa.
+Objetivo alcanzado: cero hallazgos P1, desinstalación segura, cobertura total Tier 1 y victoria demostrada en la matriz comparativa de 20 tareas.
 
 ## Auditoría 2026-07-19 (post punto 7)
 

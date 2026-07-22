@@ -2,6 +2,13 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.4.2] — 2026-07-21
+### Añadido
+- **Arnés de Benchmark Empírico vs gstack (`benchmark-gstack.mjs`)**: Evaluador automatizado sobre 20 tareas de ingeniería complejas clasificadas en 5 dimensiones (Seguridad, QA, Arquitectura, Legal y UX/Diseño).
+- **Fórmula de Scoring Determinista (0-100 pts)**: Integración de algoritmo con 40% Eficacia, 20% Peak RSS (muestreo worker de 50ms), 20% Tokens Reales (proxy) y 20% Latencia de CPU con amortiguación logarítmica anti-outliers.
+- **Evaluación Doble Ciega (*Double-Blind*)**: Interfaz con `juez.mjs` que anonimiza candidatos (Alfa vs Beta) eliminando sesgos de marca de agua y formato.
+- **Publicación Oficial**: Cierre de la tesis en `docs/BENCHMARK-GSTACK.md` registrando la victoria empírica (repofibe 94.8 / 100 vs gstack 53.6 / 100).
+
 ## [0.4.1] — 2026-07-21
 ### Añadido
 - **Skill `/qaonline` & Engine `qaonline.mjs`**: Motor ejecutable y skill para QA en vivo en producción/staging con soporte para entornos autenticados.

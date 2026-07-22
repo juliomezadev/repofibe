@@ -216,6 +216,7 @@ async function ejecutarPrueba(rutaRel, nombre) {
 }
 
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
+await ejecutarPrueba("evals/inteligencia/benchmark-gstack.mjs", "Benchmark Comparativo gstack");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts");
