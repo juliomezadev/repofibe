@@ -2,6 +2,14 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.5.0] — 2026-07-21
+### Añadido
+- **Git 3-Way Merge Driver Nativo (`sync.mjs git-merge`)**: Integración en `.gitattributes` (`merge=repofibe-memoria`) para fusionar la memoria `.fabrica/memoria.jsonl` automáticamente entre máquinas mediante 3-way merge (%O, %A, %B) sin marcas de conflicto `<<<<<<< HEAD`.
+- **Fail-Safe contra Corrupción de JSONL**: Verificación estricta por línea en `sync.mjs`; aborta con `exit(1)` ante sintaxis rota delegando el conflicto a Git de forma segura.
+- **Normalización Multiplataforma**: Sanitización forzada de separadores (`\` a `/`) en todas las entradas de memoria JSONL para prevenir duplicación cruzada entre Windows y Linux.
+- **Auto-Pull en Push**: Re-intento automático con auto-pull en `sync.mjs push` ante rechazos `non-fast-forward`.
+- **Evals para Hosts Secundarios (`instalacion-hosts-secundarios.mjs`)**: Arnés de pruebas aislado para **Cursor** (`.cursor/skills`), **Codex CLI** (`.codex/skills`) y **OpenCode** (`.config/opencode/skills`), validando ownership de ediciones del usuario e idempotencia.
+
 ## [0.4.2] — 2026-07-21
 ### Añadido
 - **Arnés de Benchmark Empírico vs gstack (`benchmark-gstack.mjs`)**: Evaluador automatizado sobre 20 tareas de ingeniería complejas clasificadas en 5 dimensiones (Seguridad, QA, Arquitectura, Legal y UX/Diseño).
