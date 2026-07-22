@@ -28,7 +28,16 @@ Todo en español: skills, mensajes, docs, commits.
 ## Instalación
 
 **Requisitos:** [Node.js](https://nodejs.org) 18+ y Git. Nada más — cero
-dependencias npm, cero binarios compilados.
+dependencias npm, cero binarios compilados en el núcleo.
+
+> **Nota de honestidad:** algunas capacidades avanzadas usan herramientas
+> externas OPCIONALES que se importan dinámicamente y degradan con gracia si
+> no están: Playwright para navegador/QA/scrape (`/qa`, `/scrape`,
+> `/design-review`, `/autenticar`), `@xenova/transformers` para búsqueda
+> semántica de memoria (~90MB de modelo la primera vez; sin él, `/memoria`
+> cae a búsqueda textual), y el CLI de un LLM (`claude`/`gemini`) para el
+> juez tier-3. El núcleo — estado, guardias, grafo, sync, checkpoints — es
+> cero-deps de verdad.
 
 ```powershell
 # Windows

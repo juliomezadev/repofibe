@@ -16,7 +16,7 @@ import { strictEqual, ok } from "node:assert";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mergeJsonl, escanearSecretos } from "../../nucleo/sync.mjs";
+import { mergeJsonl, escanearSecretos, gitMerge3Way } from "../../nucleo/sync.mjs";
 
 const TEMP = mkdtempSync(join(tmpdir(), "repofibe-sync-eval-"));
 
@@ -67,11 +67,39 @@ async function probarEscaneoSecretos() {
   console.log("ok: escanearSecretos redacta de verdad antes de push (BUG 2 de seguridad, cubierto)");
 }
 
+function probarMerge3WayNoCorrompe() {
+  // BUG 4 (crítico, auditoría 2026-07-19): gitMerge3Way normalizaba \→/ en el
+  // CONTENIDO escrito, corrompiendo rutas Windows, regex y escapes en cada
+  // merge entre máquinas. Debe preservar el contenido original intacto.
+  const A = join(TEMP, "m3-anc"), L = join(TEMP, "m3-loc"), R = join(TEMP, "m3-rem");
+  const entrada = JSON.stringify({ id: "1", tipo: "error", texto: "build en C:\\Users\\app; regex \\d+" });
+  writeFileSync(A, ""); writeFileSync(L, entrada + "\n"); writeFileSync(R, "");
+  gitMerge3Way(A, L, R);
+  const salida = readFileSync(L, "utf8").trim();
+  strictEqual(salida, entrada, "gitMerge3Way NO debe alterar el contenido (backslashes intactos)");
+  strictEqual(JSON.parse(salida).texto, "build en C:\\Users\\app; regex \\d+", "el texto con backslashes sobrevive el merge");
+
+  // Merge real de dos lados con entradas distintas: une ambas, dedup de la común.
+  const comun = entrada;
+  const soloLocal = JSON.stringify({ id: "2", tipo: "nota", texto: "ruta local D:\\proyecto" });
+  const soloRemoto = JSON.stringify({ id: "3", tipo: "nota", texto: "ruta remota E:\\otro" });
+  writeFileSync(A, comun + "\n");
+  writeFileSync(L, comun + "\n" + soloLocal + "\n");
+  writeFileSync(R, comun + "\n" + soloRemoto + "\n");
+  gitMerge3Way(A, L, R);
+  const merged = lineas(L);
+  strictEqual(merged.length, 3, "unión: común + soloLocal + soloRemoto = 3 líneas");
+  ok(merged.every((l) => { try { JSON.parse(l); return true; } catch { return false; } }), "todas las líneas siguen siendo JSON válido tras el merge de 3 lados");
+  ok(merged.some((l) => l.includes("D:\\\\proyecto")) && merged.some((l) => l.includes("E:\\\\otro")), "los backslashes de ambos lados sobreviven");
+  console.log("ok: gitMerge3Way NO corrompe backslashes (BUG 4 crítico cubierto) + unión 3-way correcta");
+}
+
 try {
   await probarMergeConId();
   await probarMergeSinId();
   await probarEscaneoSecretos();
-  console.log("Sync: mergeJsonl (con/sin id, idempotente) y escanearSecretos verificados sobre el código real; push/pull con git sigue siendo job manual.");
+  probarMerge3WayNoCorrompe();
+  console.log("Sync: mergeJsonl, escanearSecretos y gitMerge3Way (sin corrupción) verificados sobre el código real; push/pull con git sigue siendo job manual.");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });
 }

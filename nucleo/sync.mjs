@@ -5,7 +5,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
 const CONFIG_FILE = join(homedir(), ".repofibe", "sync-config.json");
 const DIR_SYNC = join(homedir(), ".repofibe", "sync-repo");
@@ -27,15 +27,18 @@ function guardarConfig(config) {
 // 3-Way Merge Driver para Git (%O ancestro, %A local, %B remoto)
 export function gitMerge3Way(ancestorPath, localPath, remotePath) {
   try {
+    // parsear NO muta el contenido: devuelve las líneas ORIGINALES intactas.
+    // La normalización de separadores (\ → /) se usa SOLO como clave de
+    // comparación para deduplicar entre máquinas (Windows vs Unix). Aplicarla
+    // al contenido escrito corrompía rutas, regex y escapes en cada merge.
+    const clave = (l) => l.replaceAll("\\", "/");
     const parsear = (p) => {
       if (!existsSync(p)) return [];
       const txt = readFileSync(p, "utf8");
       if (!txt.trim()) return [];
-      return txt.split("\n").filter(Boolean).map(l => {
-        // Validar JSON si parece JSON
-        if (l.trim().startsWith("{")) JSON.parse(l);
-        // Normalizar separadores de ruta (\ a /)
-        return l.replaceAll("\\", "/");
+      return txt.split("\n").filter(Boolean).map((l) => {
+        if (l.trim().startsWith("{")) JSON.parse(l); // valida, no muta
+        return l;
       });
     };
 
@@ -43,28 +46,26 @@ export function gitMerge3Way(ancestorPath, localPath, remotePath) {
     const rem = parsear(remotePath);
     const anc = (ancestorPath && existsSync(ancestorPath)) ? parsear(ancestorPath) : [];
 
-    const ancSet = new Set(anc);
-    const locSet = new Set(loc);
-    const remSet = new Set(rem);
+    const ancSet = new Set(anc.map(clave));
+    const locSet = new Set(loc.map(clave));
+    const remSet = new Set(rem.map(clave));
 
     const resultado = [];
     const procesados = new Set();
 
     // 1. Entradas de local (mantener si no fueron eliminadas en remoto o fueron creadas en local)
     for (const l of loc) {
-      const enAnc = ancSet.has(l);
-      const enRem = remSet.has(l);
-      if (!enAnc || enRem) {
-        if (!procesados.has(l)) { resultado.push(l); procesados.add(l); }
+      const k = clave(l);
+      if (!ancSet.has(k) || remSet.has(k)) {
+        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
       }
     }
 
     // 2. Entradas de remoto (mantener si no fueron eliminadas en local o fueron creadas en remoto)
     for (const l of rem) {
-      const enAnc = ancSet.has(l);
-      const enLoc = locSet.has(l);
-      if (!enAnc || enLoc) {
-        if (!procesados.has(l)) { resultado.push(l); procesados.add(l); }
+      const k = clave(l);
+      if (!ancSet.has(k) || locSet.has(k)) {
+        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
       }
     }
 
@@ -221,12 +222,21 @@ export async function pull(dirFabrica) {
 
 export function configurar(repoUrl) {
   guardarConfig({ repo: repoUrl, configurado: new Date().toISOString() });
-  try {
-    execSync('git config --local merge.repofibe-memoria.name "Merge driver para memoria JSONL de Repofibe"');
-    execSync('git config --local merge.repofibe-memoria.driver "node nucleo/sync.mjs git-merge %O %A %B"');
-  } catch (e) {}
   console.log(`Repo de sync configurado: ${repoUrl}`);
-  console.log("Merge Driver 3-Way registrado en Git local.");
+  // Ruta ABSOLUTA a este sync.mjs: git corre el driver desde el toplevel del
+  // repo, que puede no ser el checkout de repofibe — una ruta relativa
+  // apuntaría a un archivo inexistente. Si el registro falla, se avisa (no se
+  // traga en silencio: sin driver, git haría un merge por defecto que puede
+  // corromper la memoria).
+  try {
+    const esteScript = fileURLToPath(import.meta.url).replaceAll("\\", "/");
+    execSync('git config --local merge.repofibe-memoria.name "Merge driver para memoria JSONL de Repofibe"');
+    execSync(`git config --local merge.repofibe-memoria.driver "node \\"${esteScript}\\" git-merge %O %A %B"`);
+    console.log("Merge Driver 3-Way registrado en Git local.");
+  } catch (e) {
+    console.warn(`AVISO: no se pudo registrar el merge driver (${e.message.split("\n")[0]}).`);
+    console.warn("Sin él, git usará el merge por defecto para .fabrica/*.jsonl. Registra manualmente o corre 'configurar' dentro de un repo git.");
+  }
 }
 
 // CLI Entrypoint

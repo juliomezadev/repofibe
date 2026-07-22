@@ -2,6 +2,26 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.5.1] — 2026-07-19
+### Corregido (auditoría del trabajo v0.4–v0.5)
+- **CRÍTICO — corrupción de memoria en el merge driver**: `gitMerge3Way`
+  normalizaba `\`→`/` en el CONTENIDO escrito, no solo en la clave de
+  comparación — así que toda entrada de memoria con backslash (rutas
+  Windows `C:\Users\...`, regex `\d+`, escapes, código) se corrompía en cada
+  merge entre máquinas. Probado con evidencia (`C:\Users\app` → `C://Users//app`).
+  Ahora la normalización se usa SOLO como clave de dedup; el contenido se
+  escribe intacto. Cubierto por eval (`evals/nucleo/sync.mjs`) — que antes no
+  tocaba este caso.
+- **Merge driver frágil**: se registraba con ruta relativa (`node
+  nucleo/sync.mjs`), que falla si git corre el merge desde otro cwd. Ahora
+  usa la ruta absoluta de `sync.mjs`. Y el registro dejó de tragar errores
+  en silencio: si falla, avisa (sin driver, git haría un merge por defecto
+  que puede corromper la memoria).
+- **Honestidad cero-deps**: el README ahora aclara que el núcleo es
+  cero-deps de verdad, pero capacidades avanzadas usan herramientas
+  externas OPCIONALES que degradan con gracia (Playwright, embeddings
+  `@xenova/transformers` ~90MB, CLI de LLM para el juez).
+
 ## [0.5.0] — 2026-07-21
 ### Añadido
 - **Git 3-Way Merge Driver Nativo (`sync.mjs git-merge`)**: Integración en `.gitattributes` (`merge=repofibe-memoria`) para fusionar la memoria `.fabrica/memoria.jsonl` automáticamente entre máquinas mediante 3-way merge (%O, %A, %B) sin marcas de conflicto `<<<<<<< HEAD`.
