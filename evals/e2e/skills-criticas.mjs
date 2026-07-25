@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // evals/e2e/skills-criticas.mjs — tier 2: valida 5 skills críticas end-to-end
-// contra casos de prueba reales y pequeños, con un juez LLM minimalista
-// (Haiku). Se recoge automáticamente por evals/tier2.mjs (que corre cada
+// contra casos de prueba reales y pequeños, con un juez LLM de veredicto
+// binario sobre Opus 5. Se recoge automáticamente por evals/tier2.mjs (que corre cada
 // archivo de evals/e2e/), así que "node evals/tier2.mjs" ya la ejecuta.
 //
 // Diferencia con lo que ya existe:
@@ -33,7 +33,12 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const MODELO = "claude-haiku-4-5";
+// Opus 5 tanto para el ACTOR (la skill bajo prueba) como para el JUEZ.
+// Decisión deliberada: la eval debe medir la skill como se ejecuta de verdad,
+// con el modelo más capaz — un juez débil aprueba respuestas mediocres y una
+// eval que miente es peor que no tener eval. El precio de eso es que esta
+// suite cuesta más por corrida; por eso es job manual con key, no CI.
+const MODELO = "claude-opus-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
 // ── Casos de prueba: 1 por skill crítica, deliberadamente pequeños ──────────
