@@ -258,6 +258,7 @@ rmSync(tmp, { recursive: true, force: true });
 //   3. El límite de 30 s se quedó corto al crecer las suites
 //      (instalacion-hosts tarda ~11 s sola, más bajo carga). 90 s.
 const LIMITE_MS = 90_000;
+const parciales = [];
 
 async function ejecutarPrueba(rutaRel, nombre) {
   const ruta = join(RAIZ, rutaRel);
@@ -277,6 +278,14 @@ async function ejecutarPrueba(rutaRel, nombre) {
     fallo(`${rutaRel}: ${salida || `salió con código ${r.status} sin producir salida`}`);
     return;
   }
+  // Verificación PARCIAL ≠ verificación completa. Varias suites omiten su
+  // parte de integración cuando falta una dependencia opcional (Playwright) y
+  // lo dicen honestamente en su salida — pero al agregarlas aquí se veían
+  // idénticas a una suite verificada de punta a punta. Es el mismo fallo que
+  // en tier 2 contaba las suites omitidas como aprobadas: la suite individual
+  // era honesta, la agregación borraba el matiz.
+  const omitidas = r.stdout.split("\n").filter((l) => /^\s*omitido:/i.test(l)).length;
+  if (omitidas) parciales.push(`${nombre} (${omitidas} parte(s) omitida(s))`);
   ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
 }
 
@@ -307,5 +316,11 @@ if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);
   for (const f of fallos) console.error(`  ✗ ${f}`);
   process.exit(1);
+}
+if (parciales.length) {
+  console.log(`\nVerificación PARCIAL en ${parciales.length} suite(s) — no cuentan como verificadas de punta a punta:`);
+  for (const p of parciales) console.log(`  · ${p}`);
+  console.log("  Causa habitual: Playwright no instalado (dependencia opcional).");
+  console.log("  Para cerrarlas: npm install playwright && npx playwright install chromium");
 }
 console.log("\nTodo verde. repofibe pasó las evals tier 1.");
