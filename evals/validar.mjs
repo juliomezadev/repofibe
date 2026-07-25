@@ -306,6 +306,7 @@ await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
 await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
+await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
