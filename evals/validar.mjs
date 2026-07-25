@@ -203,6 +203,44 @@ if (!fallos.some((f) => f.startsWith("guardia"))) ok("guardia.mjs: destructivos�
 
 rmSync(tmp, { recursive: true, force: true });
 
+// ── 6b. Guardia anti-fabricación: cero aleatoriedad en evals/ ────────────────
+// Regla de clase 2, nacida de un caso real (2026-07-25): el arnés
+// `benchmark-gstack.mjs` publicaba "mediciones empíricas" de repofibe vs
+// gstack que en realidad eran `Math.random()` en rangos elegidos para ganar,
+// y como generar aleatorios nunca falla, corría DENTRO de esta suite dejándola
+// en verde. Ver docs/BENCHMARK-GSTACK.md (retractación).
+//
+// El principio: una suite de medición que usa aleatoriedad está fabricando
+// datos o es no determinista. Ninguna de las dos es aceptable en evals/, así
+// que la prohibición vive en código y no en una buena intención.
+// (En nucleo/ sí es legítima —generación de ids— y por eso el guardia no llega ahí.)
+{
+  const archivosMjs = [];
+  const recorrer = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) recorrer(p);
+      else if (e.name.endsWith(".mjs")) archivosMjs.push(p);
+    }
+  };
+  recorrer(join(RAIZ, "evals"));
+
+  const culpables = archivosMjs.filter((p) => {
+    const t = readFileSync(p, "utf8");
+    // Se ignoran las menciones en comentarios (la retractación cita el patrón).
+    return t.split("\n").some((l) => /Math\.random\s*\(/.test(l) && !/^\s*(\/\/|\*)/.test(l));
+  });
+
+  if (culpables.length) {
+    fallo(
+      `aleatoriedad en evals/: ${culpables.map((p) => p.replace(RAIZ, "").replace(/\\/g, "/")).join(", ")}. ` +
+      `Una eval con generación aleatoria fabrica datos o no es determinista (ver docs/BENCHMARK-GSTACK.md).`
+    );
+  } else {
+    ok(`sin aleatoriedad en las ${archivosMjs.length} evals: ninguna puede fabricar mediciones`);
+  }
+}
+
 // ── 7. Suites independientes (inteligencia, legal, seguridad de instalación) ─
 // Viven aparte porque tienen su propio arnés (assert de Node, hogares
 // temporales); se agregan aquí para que ningún push quede en verde con una
@@ -216,7 +254,7 @@ async function ejecutarPrueba(rutaRel, nombre) {
 }
 
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
-await ejecutarPrueba("evals/inteligencia/benchmark-gstack.mjs", "Benchmark Comparativo gstack");
+await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");

@@ -2,6 +2,50 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.6.0] — 2026-07-25
+### RETRACTADO — el benchmark contra gstack era fabricado
+- **Se retractan las cifras "repofibe 94.8 / 100 vs gstack 53.4 / 100"**
+  publicadas en `docs/BENCHMARK-GSTACK.md` y anunciadas en la v0.4.2 de este
+  changelog como "victoria empírica". Nunca hubo tal medición. El arnés
+  `evals/inteligencia/benchmark-gstack.mjs` no ejecutaba gstack, no importaba
+  `juez.mjs` (no existió evaluación doble ciega), fijaba `eficacia: true` para
+  repofibe por constante y `tarea.id % 4 !== 0` para gstack, y producía Peak
+  RSS, tokens y latencia con `Math.random()` en rangos elegidos para ganar.
+  La tabla de 40 scores por tarea estaba escrita a mano.
+- **Agravante corregido:** ese arnés corría dentro de `evals/validar.mjs`, así
+  que la suite reportaba "Todo verde" certificando la ficción — generar
+  aleatorios nunca falla, luego esa prueba no podía ponerse en rojo jamás.
+- **Eliminado** `evals/inteligencia/benchmark-gstack.mjs`.
+- **Conservado** lo que sí era trabajo real, en `evals/inteligencia/modelo-scoring.mjs`:
+  el catálogo de 20 tareas y la fórmula `calcularScore`, ahora probada con
+  vectores conocidos (casos límite, saturación y determinismo) en vez de
+  ejercitada con aleatorios. Nuevo `puntuarComparacion()` que **rechaza**
+  puntuar sin mediciones que declaren su procedencia: sin corrida no hay cifra.
+- **Nuevo guardia determinista** en `evals/validar.mjs`: falla si aparece
+  aleatoriedad en cualquier archivo de `evals/`. Una suite de medición que usa
+  `Math.random` está fabricando datos o es no determinista, y ninguna de las
+  dos es aceptable. Probado que detecta la recaída (se introdujo una violación
+  a propósito, falló, se retiró, pasó). En `nucleo/` sigue siendo legítimo
+  (generación de ids) y el guardia no llega ahí.
+- **`docs/PLAN-SUPERACION.md`**: las métricas de superioridad vuelven de
+  `[IMPLEMENTADA]` a `[PLANEADA]`. `docs/BENCHMARK-GSTACK.md` es ahora la
+  retractación, con el diff entre lo afirmado y lo real, y los cinco
+  requisitos para una comparación defendible.
+- Lo que sí está demostrado de repofibe no dependía de ese benchmark y se
+  mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
+  que las evals encontraron antes de publicar.
+
+### Añadido — evals tier 2 end-to-end
+- `evals/e2e/skills-criticas.mjs`: invoca 5 skills críticas con su `SKILL.md`
+  real como system prompt y las somete a un juez de veredicto binario. Actor y
+  juez con **Opus 5**: un juez débil aprueba respuestas mediocres, y una eval
+  que miente es peor que no tener eval. Job manual con `ANTHROPIC_API_KEY`,
+  nunca CI, porque cuesta dinero por corrida y eso se declara.
+
+### Añadido — plan v1.0
+- `docs/fabrica/2026-07-25-plan-lazo-cerrado.md`: la fábrica se mide a sí
+  misma. Diagnóstico, fases por dependencia y criterios de "funcionó".
+
 ## [0.5.2] — 2026-07-19
 ### Añadido — `/legal` ahora experto en derecho laboral colombiano
 - **Derecho laboral en todos sus ámbitos** (`skills/legal/laboral.md`, nueva

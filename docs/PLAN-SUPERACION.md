@@ -89,15 +89,31 @@ en este documento sí tienen evals que los ejecutan de verdad.
 - `autónomo`: trabaja dentro de un workspace autorizado, con checkpoints y
   rollback; nunca ejecuta destructivos o deploy sin aprobación.
 
-## Métricas para afirmar superioridad `[IMPLEMENTADA]`
+## Métricas para afirmar superioridad `[PLANEADA]`
 
-El arnés de benchmark empírico determinista `evals/inteligencia/benchmark-gstack.mjs` evalúa 20 tareas de ingeniería complejas comparando `repofibe` contra `gstack` con evaluación Doble Ciega (`juez.mjs`) y telemetría de Peak RSS y Tokens.
+**Retractado el 2026-07-25.** Este apartado decía `[IMPLEMENTADA]` y publicaba
+"repofibe 94.8 / gstack 53.4" citando `evals/inteligencia/benchmark-gstack.mjs`
+como arnés empírico con evaluación doble ciega. Al auditarlo se encontró que
+ese arnés **no medía nada**: nunca ejecutó gstack, nunca importó `juez.mjs`, y
+generaba RSS, tokens y latencia con `Math.random()` en rangos elegidos para que
+repofibe ganara. Las cifras eran inventadas y la tabla por tarea, escrita a mano.
 
-Resultados publicados en `docs/BENCHMARK-GSTACK.md`:
-- **repofibe v0.4.1:** 94.8 / 100 pts
-- **gstack:** 53.4 / 100 pts
+Retractación completa, con el diff de lo afirmado contra lo real y los cinco
+requisitos para una comparación defendible: `docs/BENCHMARK-GSTACK.md`.
 
-Objetivo alcanzado: cero hallazgos P1, desinstalación segura, cobertura total Tier 1 y victoria demostrada en la matriz comparativa de 20 tareas.
+Estado honesto hoy: **no se ha medido ninguna comparación contra gstack.** Se
+conserva el catálogo de 20 tareas y la fórmula de puntuación (ahora probada con
+vectores conocidos) en `evals/inteligencia/modelo-scoring.mjs`, y un guardia en
+`evals/validar.mjs` impide que vuelva a aparecer aleatoriedad en la suite.
+
+Lo que sí está demostrado y se sostiene: cero hallazgos P1, desinstalación
+segura, cobertura Tier 1 con evals que ejecutan de verdad, y los bugs reales
+que esas evals encontraron antes de publicar (documentados arriba, caso por caso).
+
+**Lección de método:** la afirmación de superioridad no falló por falta de
+esfuerzo, falló porque nadie corrió el arnés que la sostenía. Una eval que no
+puede ponerse en rojo no es una eval. Ese es el criterio que ahora aplica el
+guardia anti-aleatoriedad.
 
 ## Auditoría 2026-07-19 (post punto 7)
 
