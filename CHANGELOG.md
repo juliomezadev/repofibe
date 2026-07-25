@@ -35,6 +35,40 @@ Todas las novedades de repofibe, versión por versión.
   mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
   que las evals encontraron antes de publicar.
 
+### Añadido — `/legal` deja de ser prompt puro: auditor determinista de procedencia
+- **El problema.** `/legal` era **100% clase 3**: todas sus garantías vivían en
+  el texto de `SKILL.md` ("nunca inventes cifras", "verifica antes de afirmar").
+  Un modelo potente lo cumple casi siempre; uno débil lo cumple a medias. Y en
+  materia legal "a medias" es una cifra o un artículo inventado que suena
+  perfectamente creíble — el daño real que la skill promete evitar. La eval
+  existente validaba el TEXTO de la skill, nunca una respuesta.
+- **`nucleo/legal.mjs`.** La IA redacta; el módulo audita el borrador antes de
+  entregarlo. Funciona igual con cualquier modelo porque no depende de que el
+  modelo recuerde nada. Detecta montos, porcentajes, artículos, normas y
+  afirmaciones de vigencia **sin procedencia declarada**, y marca como
+  **crítico** lo que contradice una cifra ya verificada.
+- **Contrato de marcas:** cada afirmación de riesgo lleva en su línea
+  `[verificado: <fuente> <fecha>]`, `[del documento]` o `[no verificado]`.
+  El módulo no juzga si el dato es correcto —un regex no puede— sino si el
+  borrador declara de dónde salió. `[no verificado]` es una marca válida: la
+  skill no está obligada a saberlo todo, sino a no fingir que lo sabe.
+- **Registro de cifras verificadas** (`legal-verificado.jsonl`): rechaza
+  fuentes fuera del allowlist oficial y procedencia incompleta. **Empieza
+  vacío a propósito** — precargarlo con el SMLMV de memoria sería cometer el
+  error que existe para impedir, y las cifras laborales caducan cada año.
+- **Dos bugs propios que encontró su eval antes de shipear:** (1) el patrón de
+  vigencia acusaba "necesito confirmar el texto **vigente**" — una frase que
+  CUESTIONA la vigencia, justo la conducta correcta; (2) los bloques de código
+  no se ignoraban de verdad, solo se saltaba la línea del cerco ` ``` ` y se
+  auditaba el contenido ilustrativo de adentro. Un auditor que castiga lo
+  correcto se desactiva a la semana.
+- **Conciencia de negación:** "no puedo afirmar que el artículo 64 diga eso" ya
+  no se acusa; la afirmación de la línea siguiente sí. Limitación documentada:
+  solo mira la misma línea.
+- `skills/legal/verificacion.md` (nuevo) con el contrato, ejemplos y límites.
+  `SKILL.md` incorpora la auditoría como **puerta obligatoria** antes de
+  entregar, y se compactó para caber bajo el techo de 12000 caracteres.
+
 ### Añadido — blindaje: meta-evals que vigilan a las evals
 - **`evals/blindaje.mjs`.** Los dos fallos graves de esta versión no eran bugs
   de lógica, eran el mismo patrón: *algo que se afirmaba funcionando, sin

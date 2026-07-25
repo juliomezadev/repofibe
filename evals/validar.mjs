@@ -283,7 +283,8 @@ async function ejecutarPrueba(rutaRel, nombre) {
 await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
-await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
+await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
+await ejecutarPrueba("evals/legal/auditor.mjs", "Legal (auditor de procedencia)");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");
 await ejecutarPrueba("evals/seguridad/hooks-activados.mjs", "Hooks Deterministas Activables");
