@@ -27,7 +27,17 @@ prueba automatizada y evidencia reproducible. Las categorías válidas son:
 2. ✅ Núcleo confiable: guardias (`guardia.mjs`), estado (`estado.mjs`),
    grafo con hashes de contenido (`grafo.mjs`, frescura por commit) y manejo
    explícito de confianza (EXTRACTED/INFERRED/AMBIGUOUS en grafos externos).
-3. ✅ Orquestador: `nucleo/inteligencia/` — tarea, plan, riesgo, modo,
+3. 🔶 **CONSTRUIDO PERO SIN CONECTAR** (corregido 2026-07-25): la capa existe,
+   está probada y funciona por CLI, pero **ninguna de las 33 skills la
+   invoca**. Verificado buscando referencias reales a `nucleo/inteligencia/*`
+   y a `orquestador.mjs` en `skills/`: cero. Lo mismo ocurre con `juez.mjs`.
+   Estar implementado y probado no es estar en uso — es el mismo patrón que
+   tuvo `traza.mjs` durante dos versiones. El ✅ anterior inducía a creer que
+   el orquestador dirigía el trabajo de las skills, y no dirige nada.
+   `evals/blindaje.mjs` ahora avisa de los módulos probados sin uso en
+   producción, para que no vuelva a pasar en silencio.
+
+   Orquestador: `nucleo/inteligencia/` — tarea, plan, riesgo, modo,
    evidencia y transiciones de estado como contratos estructurados
    (`contratos.mjs`, `riesgo.mjs`, `modos.mjs`, `router.mjs`,
    `evidencia.mjs`), con CLI demostrable (`orquestador.mjs`) y 10 pruebas

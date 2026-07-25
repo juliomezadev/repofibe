@@ -2,6 +2,31 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.6.2] — 2026-07-25
+### Corregido — la capa de inteligencia estaba construida pero SIN CONECTAR
+- **`docs/PLAN-SUPERACION.md` marcaba ✅ el orquestador.** La capa
+  `nucleo/inteligencia/` (contratos, riesgo, modos, router, evidencia) existe,
+  funciona por CLI y tiene 49 aserciones. Pero **ninguna de las 33 skills la
+  invoca**: verificado buscando referencias reales a `nucleo/inteligencia/*` y
+  a `orquestador.mjs` dentro de `skills/` — cero. Lo mismo con `juez.mjs`.
+  El ✅ inducía a creer que el orquestador dirigía el trabajo de las skills, y
+  no dirige nada. Pasa a 🔶 CONSTRUIDO PERO SIN CONECTAR.
+- **`evals/blindaje.mjs` no lo detectaba, y ahora sí.** El guardia
+  anti-huérfanos contaba las evals como "alguien que lo usa", así que un módulo
+  probado y desconectado le parecía sano. Ahora distingue *referenciado por
+  alguien* de **usado en producción**, y avisa de los que solo aparecen en sus
+  propias evals. Probado ≠ en uso: es exactamente lo que hace creer que una
+  capacidad existe.
+- Se emite como aviso, no como fallo: puede ser trabajo en curso legítimo, y
+  romper la suite por ello sería ruido. Pero queda a la vista en cada corrida.
+
+### Nota de método
+Al medir esto la primera vez conté cuántas skills mencionaban "riesgo",
+"evidencia" y "contratos" — palabras corrientes en español— y salieron 8, 12 y
+5. Cifra sin sentido. La medición correcta (referencias al módulo, no a la
+palabra) da cero en los seis casos. Queda anotado porque es el mismo error que
+esta versión corrige: medir algo parecido a lo que importa y darlo por bueno.
+
 ## [0.6.1] — 2026-07-25
 ### Corregido — la capacidad de navegador estaba MUERTA (6 bugs)
 Al instalar Playwright y Chromium por primera vez, las 4 suites que siempre se

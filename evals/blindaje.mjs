@@ -88,15 +88,31 @@ const rel = (p) => p.replace(RAIZ, "").replaceAll("\\", "/").replace(/^\//, "");
   ].filter((p) => existsSync(p));
 
   const huerfanos = [];
+  const soloEvals = [];
   for (const m of modulos) {
     const patron = new RegExp(`\\b${m}\\.mjs\\b|nucleo/${m}\\b`);
     const referentes = fuentes.filter((p) => basename(p) !== `${m}.mjs` && patron.test(readFileSync(p, "utf8")));
-    if (referentes.length === 0) huerfanos.push(m);
+    if (referentes.length === 0) { huerfanos.push(m); continue; }
+    // Un módulo al que SOLO lo referencian sus propias evals está probado
+    // pero desconectado: nada en producción lo llama. La primera versión de
+    // este guardia contaba las evals como "alguien que lo usa", y por eso no
+    // vio que la capa `nucleo/inteligencia/` entera (6 módulos + orquestador,
+    // 49 aserciones) no la invocaba NINGUNA skill. Probado ≠ en uso.
+    const enProduccion = referentes.some((p) => !rel(p).startsWith("evals/"));
+    if (!enProduccion) soloEvals.push(m);
   }
 
   if (huerfanos.length) {
     fallo(`módulos del núcleo que no usa nadie: ${huerfanos.join(", ")}. O están muertos o están desconectados (el caso de traza.mjs).`);
   } else ok(`los ${modulos.length} módulos del núcleo están referenciados por alguien`);
+
+  // No es un fallo —puede ser trabajo en curso, y romper la suite por ello
+  // sería ruido—, pero tiene que estar A LA VISTA. Un módulo probado que
+  // nadie usa es exactamente lo que hace creer que una capacidad existe.
+  if (soloEvals.length) {
+    console.log(`  aviso: probados pero SIN USO en producción (solo los referencian sus evals): ${soloEvals.join(", ")}`);
+    console.log("         Existir y estar probado no es estar conectado. Ninguna skill ni hook los invoca.");
+  }
 }
 
 // ── C. Toda referencia desde una skill debe apuntar a algo real ────────────
