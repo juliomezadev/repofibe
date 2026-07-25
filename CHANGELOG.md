@@ -35,6 +35,38 @@ Todas las novedades de repofibe, versión por versión.
   mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
   que las evals encontraron antes de publicar.
 
+### Añadido — telemetría local: la fábrica por fin se mide a sí misma
+- **`nucleo/traza.mjs` cableado a los hooks.** Estaba escrito desde v0.4.0 y
+  no lo usaba nadie, así que no existía un solo dato real de qué skills se
+  usan, cuáles fallan o cuáles son peso muerto. `guardia.mjs` ya corría en
+  cada uso de herramienta: es el sensor natural, sin pagar otro proceso.
+- **`Skill` añadido al matcher de PreToolUse** — sin eso las invocaciones de
+  skills eran invisibles, que era justo el dato que hacía falta.
+- **Solo metadatos, nunca contenido.** Se guarda marca de tiempo, tipo,
+  nombre de herramienta/skill y decisión del guardia. No se guardan comandos,
+  rutas, argumentos ni prompts: un comando de shell puede llevar una
+  credencial y esto escribe a disco. Lista blanca en el código; la eval
+  intenta colar un secreto y verifica que no llega al archivo.
+- **Tres bugs de `traza.mjs` corregidos antes de cablearlo:**
+  1. Importarlo instalaba handlers de `uncaughtException` (forzaba exit 1) y
+     de SIGINT/SIGTERM. Un hook fail-open no puede heredar eso — `guardia.mjs`
+     habría podido romper la sesión del usuario. Ahora son opt-in vía
+     `instalarRedDeSeguridad()`; solo queda el de `exit`, que es síncrono y no
+     puede alterar el código de salida.
+  2. La ruta se resolvía con `process.cwd()` al importar, no al llamar. Un
+     hook recibe su cwd en el payload y puede no coincidir.
+  3. El buffer asíncrono (lotes de 20 / 500 ms) pierde datos en un proceso que
+     vive 30 ms. Los hooks usan `registrar()`, escritura síncrona de un evento.
+- **Apagable** con `.fabrica/traza.json` → `{"activo": false}`. Local y
+  gitignorada; cero telemetría remota, sin cambios en esa promesa.
+- **Lectura:** `node nucleo/traza.mjs ver [n]` — últimos eventos y ranking de
+  uso. `inspeccionar <id>` sigue dando el árbol de una traza.
+- **Eval reescrita** (`evals/nucleo/traza.mjs`), 9 verificaciones que ejecutan
+  el hook de verdad: anidación, lista blanca anti-fuga, truncado, apagado,
+  fallo silencioso, registro real vía `guardia.mjs`, y que **el guardia siga
+  pidiendo confirmación ante `rm -rf` incluso con la traza rota**. Antes
+  escribía en el `.fabrica` del repo real; ahora usa directorio temporal.
+
 ### Añadido — evals tier 2 end-to-end
 - `evals/e2e/skills-criticas.mjs`: invoca 5 skills críticas con su `SKILL.md`
   real como system prompt y las somete a un juez de veredicto binario. Actor y

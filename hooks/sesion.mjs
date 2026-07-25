@@ -75,10 +75,19 @@ function chequearActualizacion() {
   } catch { return null; }
 }
 
+// Import dinámico protegido: si nucleo/ no estuviera, este hook no puede
+// romper el arranque de la sesión. Mismo criterio que guardia.mjs.
+let registrar = () => false;
+try { ({ registrar } = await import("../nucleo/traza.mjs")); } catch {}
+
 try {
   const entrada = JSON.parse(readFileSync(0, "utf8"));
   const cwd = entrada.cwd ?? process.cwd();
   const partes = [];
+
+  // Marca de inicio: da el denominador para leer el resto de la traza
+  // ("N skills usadas en M sesiones"). Solo metadatos.
+  try { registrar({ ev: "sesion", n: "inicio" }, { raiz: cwd }); } catch {}
 
   const aviso = chequearActualizacion();
   if (aviso) partes.push(aviso);

@@ -15,8 +15,26 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 
+// Telemetría local: este hook ya corre en cada uso de herramienta, así que es
+// el sensor natural de "qué se usa" sin pagar el arranque de otro proceso.
+// Import DINÁMICO y protegido a propósito: si nucleo/ no estuviera (copia
+// parcial, instalación a medias), un import estático fallido tumbaría el hook
+// entero. Fail-open empieza por poder cargarse.
+let registrar = () => false;
+try { ({ registrar } = await import("../nucleo/traza.mjs")); } catch {}
+
 function leerJson(ruta) {
   try { return JSON.parse(readFileSync(ruta, "utf8")); } catch { return null; }
+}
+
+// Contexto de lo que se va a registrar. SOLO metadatos: nombre de herramienta
+// y, si aplica, nombre de skill. Nunca el comando, la ruta ni los argumentos
+// — un comando de shell puede llevar una credencial y esto escribe a disco.
+let contexto = null;
+
+function salir(decision) {
+  try { if (contexto) registrar({ ...contexto, d: decision }, { raiz: contexto.raiz }); } catch {}
+  process.exit(0);
 }
 
 function responder(decision, razon) {
@@ -27,7 +45,7 @@ function responder(decision, razon) {
       permissionDecisionReason: razon,
     },
   }));
-  process.exit(0);
+  salir(decision);
 }
 
 // Patrones destructivos: [regex, descripción]. Cobertura Bash + PowerShell + cmd + SQL.
@@ -55,6 +73,14 @@ try {
   const input = entrada.tool_input ?? {};
   const cwd = entrada.cwd ?? process.cwd();
 
+  // Una invocación de skill llega como herramienta "Skill"; el nombre de la
+  // skill es el dato que de verdad importa para saber qué se usa.
+  contexto = {
+    raiz: cwd,
+    ev: tool === "Skill" ? "skill" : "herramienta",
+    n: tool === "Skill" ? String(input.skill ?? "?") : tool,
+  };
+
   // ── Protección 2: congelamiento de directorio ─────────────────────────────
   if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tool)) {
     const objetivo = resolve(input.file_path ?? input.notebook_path ?? "");
@@ -73,7 +99,7 @@ try {
           `El archivo ${objetivo} está fuera del límite. Descongela con /guardian descongelar si es intencional.`);
       }
     }
-    process.exit(0); // edición permitida, sin opinión
+    salir("permitir"); // edición permitida, sin opinión
   }
 
   // ── Protección 1: comandos destructivos ───────────────────────────────────
@@ -90,7 +116,7 @@ try {
     }
   }
 
-  process.exit(0);
+  salir("permitir");
 } catch {
   process.exit(0); // fail-open: nunca romper la sesión
 }

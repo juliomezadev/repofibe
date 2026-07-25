@@ -121,6 +121,37 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 - En Claude Code, un hook SessionStart inyecta este contexto al abrir la
   sesión: la fábrica nunca empieza de cero.
 
+## Telemetría local (qué se guarda y cómo apagarla)
+
+La fábrica anota su propio uso en `.fabrica/traza.jsonl` para poder responder
+con datos —y no con intuición— qué skills se usan, cuáles fallan y cuáles son
+peso muerto.
+
+```bash
+node nucleo/traza.mjs ver 20            # últimos eventos + más frecuentes
+node nucleo/traza.mjs inspeccionar <id> # árbol de una traza concreta
+```
+
+Qué se guarda, exactamente:
+
+```jsonl
+{"ts":1784963646117,"ev":"skill","n":"legal","d":"permitir"}
+{"ts":1784963647349,"ev":"herramienta","n":"Bash","d":"ask"}
+```
+
+Marca de tiempo, tipo de evento, nombre de la herramienta o skill, y la
+decisión del guardia. **Nada más.** No se guardan comandos, rutas de archivo,
+argumentos ni prompts: un comando de shell puede llevar una credencial dentro
+y esto escribe a disco. El filtro es una lista blanca en el código, no una
+buena intención — `evals/nucleo/traza.mjs` lo verifica intentando colar un
+secreto y comprobando que no llega al archivo.
+
+- **Local y tuya.** `.fabrica/` está gitignorado y no sale de tu máquina.
+  Cero telemetría remota, por diseño.
+- **Se apaga** con `.fabrica/traza.json` → `{"activo": false}`.
+- **Nunca estorba.** Si no puede escribir, falla en silencio; los hooks
+  siguen funcionando igual (probado con la traza deliberadamente rota).
+
 ## Calidad del propio repo
 
 ```bash
