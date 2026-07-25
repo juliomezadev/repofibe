@@ -165,7 +165,11 @@ async function main() {
     console.log("Job manual con costo, por diseño (mismo criterio que nucleo/juez.mjs).");
     console.log("Para correrlo: ANTHROPIC_API_KEY=sk-... node evals/e2e/skills-criticas.mjs");
     console.log("0/5 (omitido)");
-    process.exit(0);
+    // Código 3 = OMITIDA, no "pasó". Salir 0 aquí hacía que el despachador de
+    // tier 2 la contara como suite verde: la misma ilusión de cobertura que
+    // el benchmark fabricado, en versión suave. Omitir es un tercer estado y
+    // debe verse como tal.
+    process.exit(3);
   }
 
   console.log(`Evaluando ${CASOS.length} skills críticas con juez ${MODELO} (en paralelo)...\n`);

@@ -35,6 +35,42 @@ Todas las novedades de repofibe, versión por versión.
   mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
   que las evals encontraron antes de publicar.
 
+### Añadido — blindaje: meta-evals que vigilan a las evals
+- **`evals/blindaje.mjs`.** Los dos fallos graves de esta versión no eran bugs
+  de lógica, eran el mismo patrón: *algo que se afirmaba funcionando, sin
+  ningún mecanismo capaz de detectar que no*. Arreglar los dos casos no impide
+  el tercero, así que ahora se vigila la clase entera:
+  1. **Toda eval debe poder ponerse en rojo.** Una prueba que no puede fallar
+     no prueba nada (era literalmente el benchmark fabricado).
+  2. **Ningún módulo del núcleo puede quedar huérfano.** `traza.mjs` estuvo
+     dos versiones escrito, probado y sin que lo llamara nadie.
+  3. **Toda referencia de una skill a `nucleo/*.mjs` debe existir.**
+  4. **Todo hook declarado debe existir**, y el matcher debe cubrir `Skill`.
+  Probado que detecta de verdad: se introdujo una eval decorativa y un módulo
+  huérfano, ambos fueron señalados, se retiraron, verde.
+- **Falso positivo propio corregido en el acto:** la primera versión acusó a
+  `tier2.mjs` por buscar el literal `process.exit(1)` sin reconocer
+  `process.exit(fallos ? 1 : 0)`. Un detector demasiado estrecho acusa a
+  pruebas sanas y erosiona la confianza en el guardia mismo.
+
+### Corregido — tres agujeros en los despachadores de evals
+- **Una eval borrada o renombrada desaparecía en silencio.** `validar.mjs`
+  hacía `if (!existsSync(ruta)) return;` — la suite seguía en verde por dejar
+  de correr una prueba. Es exactamente cómo el arnés fabricado podría haberse
+  esfumado sin que nadie lo notara. Ahora faltar es fallar.
+- **Los timeouts producían un mensaje vacío**, imposible de diagnosticar
+  (`✗ evals/x.mjs:` y nada más). Ahora se nombran como timeout, con su límite.
+  Límite subido de 30 s a 90 s: las suites crecieron.
+- **Tier 2 contaba las suites OMITIDAS como aprobadas.** `skills-criticas`
+  sale sin `ANTHROPIC_API_KEY` y el despachador reportaba "todo verde, 2
+  suites pasaron". Ahora hay tres estados —pasó / omitida / falló— y las
+  omitidas se declaran no verificadas.
+
+### Verificado — la cadena del sprint funciona de punta a punta
+- `evals/e2e/sprint-completo.mjs` ejecuta los 8 pasos pensar→retro con
+  transiciones de estado reales, repositorio git real, grafo de dependencias,
+  selección de pruebas afectadas y checkpoints. No es prosa: corre.
+
 ### Corregido — los guardias deterministas estaban APAGADOS en instalaciones reales
 - **El hallazgo:** en una instalación real, las 33 skills estaban puestas pero
   `guardia.mjs` y `sesion.mjs` **nunca habían corrido**. El guardia

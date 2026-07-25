@@ -245,14 +245,42 @@ rmSync(tmp, { recursive: true, force: true });
 // Viven aparte porque tienen su propio arnés (assert de Node, hogares
 // temporales); se agregan aquí para que ningún push quede en verde con una
 // de estas en rojo — el punto ciego que motivó esta integración.
+// Tres correcciones de blindaje sobre este despachador (2026-07-25), todas
+// del mismo patrón que el benchmark fabricado: mecanismos que fallaban sin
+// que nadie pudiera enterarse.
+//
+//   1. `if (!existsSync(ruta)) return;` — una eval renombrada o borrada
+//      desaparecía en SILENCIO y la suite seguía en verde. Así es exactamente
+//      como el arnés fabricado podría haberse esfumado sin que nadie lo notara.
+//      Ahora falta = fallo.
+//   2. Un timeout producía `fallo("ruta: ")` con mensaje VACÍO, imposible de
+//      diagnosticar. Ahora se nombra el timeout y su límite.
+//   3. El límite de 30 s se quedó corto al crecer las suites
+//      (instalacion-hosts tarda ~11 s sola, más bajo carga). 90 s.
+const LIMITE_MS = 90_000;
+
 async function ejecutarPrueba(rutaRel, nombre) {
   const ruta = join(RAIZ, rutaRel);
-  if (!existsSync(ruta)) return;
-  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: 30000 });
-  if (r.status !== 0) fallo(`${rutaRel}: ${(r.stderr || r.stdout).trim().split("\n").slice(0, 4).join(" | ")}`);
-  else ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
+  if (!existsSync(ruta)) {
+    fallo(`${rutaRel}: la eval no existe. ¿Se renombró o borró? Una suite no puede quedar verde por dejar de correr una prueba.`);
+    return;
+  }
+
+  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: LIMITE_MS });
+
+  if (r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal)) {
+    fallo(`${rutaRel}: TIMEOUT tras ${LIMITE_MS / 1000}s (señal ${r.signal ?? "?"}). No es un fallo lógico: la prueba no alcanzó a terminar.`);
+    return;
+  }
+  if (r.status !== 0) {
+    const salida = (r.stderr || r.stdout || "").trim().split("\n").slice(0, 4).join(" | ");
+    fallo(`${rutaRel}: ${salida || `salió con código ${r.status} sin producir salida`}`);
+    return;
+  }
+  ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
 }
 
+await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
