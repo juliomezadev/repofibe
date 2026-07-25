@@ -1,5 +1,19 @@
 #!/usr/bin/env node
-import { ejecutarQAOnline } from "../../nucleo/qaonline.mjs";
+// Aislar la telemetría ANTES de importar nada que trace. Sin esto, cada
+// corrida de la suite escribía en el `.fabrica/traza.jsonl` REAL del
+// proyecto un span `qaonline: Test Dashboard Mock` con estado de fallo —
+// el mock falla a propósito, pero en la traza queda indistinguible de un
+// fallo de verdad. Envenenar la observabilidad con datos de prueba degrada
+// justo aquello que se construyó para decidir con evidencia: al auditar,
+// esos fallos falsos se tomaron por una pista real y costaron tiempo.
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+const DIR_TRAZA = mkdtempSync(join(tmpdir(), "repofibe-qaonline-traza-"));
+process.env.REPOFIBE_TRAZA_DIR = DIR_TRAZA;
+process.on("exit", () => { try { rmSync(DIR_TRAZA, { recursive: true, force: true }); } catch {} });
+
+const { ejecutarQAOnline } = await import("../../nucleo/qaonline.mjs");
 import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -64,7 +78,16 @@ async function main() {
     console.log("ok: /repofibe-qaonline con Self-Healing y Evidencia en Markdown verificado");
   } catch (err) {
     if (err.message && err.message.includes("Playwright no está instalado")) {
-      console.log("ok: /repofibe-qaonline (Playwright no disponible localmente, contratos y pipeline de fallback verificados)");
+      // Antes esta rama decía "ok: ... contratos y pipeline de fallback
+      // verificados", y con ese prefijo la agregación de tier 1 la contaba
+      // como suite verificada de punta a punta. La consecuencia: la función
+      // ESTRELLA de esta skill —la auto-curación de login (Self-Healing)—
+      // aparecía verificada sin haberse ejecutado jamás, porque necesita un
+      // navegador real. Se adopta la convención "omitido:" para que la suite
+      // la declare parcial (encontrado auditando, 2026-07-25).
+      console.log("ok: contratos y pipeline de fallback verificados (sin navegador)");
+      console.log("omitido: Self-Healing Auth y evidencia en Markdown NO se probaron — requieren Playwright. " +
+        "La función principal de esta skill queda SIN verificar: `npm install playwright && npx playwright install chromium`");
     } else {
       throw err;
     }

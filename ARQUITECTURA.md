@@ -93,8 +93,15 @@ tiers con LLM (E2E, juez) llegan en v0.2/v0.3.
   disponible: `/browse` de gstack si está instalado, o Playwright directo.
   La arquitectura del daemon de gstack (HTTP local + refs de accesibilidad)
   es correcta; la nuestra será compatible con su filosofía pero en Node.
-- **Telemetría remota** — nunca por defecto. Los datos de uso son del
-  usuario; `.fabrica/` y `~/.repofibe/` son suyos y punto.
+- **Telemetría remota** — nunca, ni por defecto ni opt-in. Los datos de uso
+  son del usuario; `.fabrica/` y `~/.repofibe/` son suyos y punto. Sí existe
+  telemetría **local** desde v0.6.0 (`.fabrica/traza.jsonl`, apagable con
+  `.fabrica/traza.json`), y es deliberadamente pobre en datos: guarda qué
+  herramienta o skill se usó y qué decidió el guardia, nunca el comando, la
+  ruta ni los argumentos. La regla se cumple por lista blanca en el código y
+  está cubierta por una eval que intenta colar un secreto y verifica que no
+  se escribe. Sin ese dato local no hay forma honesta de saber qué skills
+  sirven — la alternativa era seguir priorizando por corazonada.
 - **Soporte iOS** — fuera de alcance: exige Mac + hardware; contradice
   Windows-first.
 - **MCP** — el estándar Agent Skills cubre la distribución; MCP añadiría

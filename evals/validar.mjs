@@ -203,23 +203,111 @@ if (!fallos.some((f) => f.startsWith("guardia"))) ok("guardia.mjs: destructivos�
 
 rmSync(tmp, { recursive: true, force: true });
 
+// ── 6b. Guardia anti-fabricación: cero aleatoriedad en evals/ ────────────────
+// Regla de clase 2, nacida de un caso real (2026-07-25): el arnés
+// `benchmark-gstack.mjs` publicaba "mediciones empíricas" de repofibe vs
+// gstack que en realidad eran `Math.random()` en rangos elegidos para ganar,
+// y como generar aleatorios nunca falla, corría DENTRO de esta suite dejándola
+// en verde. Ver docs/BENCHMARK-GSTACK.md (retractación).
+//
+// El principio: una suite de medición que usa aleatoriedad está fabricando
+// datos o es no determinista. Ninguna de las dos es aceptable en evals/, así
+// que la prohibición vive en código y no en una buena intención.
+// (En nucleo/ sí es legítima —generación de ids— y por eso el guardia no llega ahí.)
+{
+  const archivosMjs = [];
+  const recorrer = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) recorrer(p);
+      else if (e.name.endsWith(".mjs")) archivosMjs.push(p);
+    }
+  };
+  recorrer(join(RAIZ, "evals"));
+
+  const culpables = archivosMjs.filter((p) => {
+    const t = readFileSync(p, "utf8");
+    // Se ignoran las menciones en comentarios (la retractación cita el patrón).
+    return t.split("\n").some((l) => /Math\.random\s*\(/.test(l) && !/^\s*(\/\/|\*)/.test(l));
+  });
+
+  if (culpables.length) {
+    fallo(
+      `aleatoriedad en evals/: ${culpables.map((p) => p.replace(RAIZ, "").replace(/\\/g, "/")).join(", ")}. ` +
+      `Una eval con generación aleatoria fabrica datos o no es determinista (ver docs/BENCHMARK-GSTACK.md).`
+    );
+  } else {
+    ok(`sin aleatoriedad en las ${archivosMjs.length} evals: ninguna puede fabricar mediciones`);
+  }
+}
+
 // ── 7. Suites independientes (inteligencia, legal, seguridad de instalación) ─
 // Viven aparte porque tienen su propio arnés (assert de Node, hogares
 // temporales); se agregan aquí para que ningún push quede en verde con una
 // de estas en rojo — el punto ciego que motivó esta integración.
+// Tres correcciones de blindaje sobre este despachador (2026-07-25), todas
+// del mismo patrón que el benchmark fabricado: mecanismos que fallaban sin
+// que nadie pudiera enterarse.
+//
+//   1. `if (!existsSync(ruta)) return;` — una eval renombrada o borrada
+//      desaparecía en SILENCIO y la suite seguía en verde. Así es exactamente
+//      como el arnés fabricado podría haberse esfumado sin que nadie lo notara.
+//      Ahora falta = fallo.
+//   2. Un timeout producía `fallo("ruta: ")` con mensaje VACÍO, imposible de
+//      diagnosticar. Ahora se nombra el timeout y su límite.
+//   3. El límite de 30 s se quedó corto al crecer las suites
+//      (instalacion-hosts tarda ~11 s sola, más bajo carga). 90 s.
+const LIMITE_MS = 90_000;
+const parciales = [];
+
+// Huella de la telemetría REAL antes de correr nada. Una suite de pruebas no
+// puede escribir en el `.fabrica/traza.jsonl` del proyecto: los spans de un
+// mock que falla a propósito quedan indistinguibles de un fallo real y
+// envenenan la observabilidad. Pasó de verdad (2026-07-25): `qaonline: Test
+// Dashboard Mock` con estado de fallo se acumuló en la traza del usuario y al
+// auditar se tomó por una pista genuina.
+const RUTA_TRAZA_REAL = join(RAIZ, ".fabrica", "traza.jsonl");
+const trazaAntes = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+
 async function ejecutarPrueba(rutaRel, nombre) {
   const ruta = join(RAIZ, rutaRel);
-  if (!existsSync(ruta)) return;
-  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: 30000 });
-  if (r.status !== 0) fallo(`${rutaRel}: ${(r.stderr || r.stdout).trim().split("\n").slice(0, 4).join(" | ")}`);
-  else ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
+  if (!existsSync(ruta)) {
+    fallo(`${rutaRel}: la eval no existe. ¿Se renombró o borró? Una suite no puede quedar verde por dejar de correr una prueba.`);
+    return;
+  }
+
+  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: LIMITE_MS });
+
+  if (r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal)) {
+    fallo(`${rutaRel}: TIMEOUT tras ${LIMITE_MS / 1000}s (señal ${r.signal ?? "?"}). No es un fallo lógico: la prueba no alcanzó a terminar.`);
+    return;
+  }
+  if (r.status !== 0) {
+    const salida = (r.stderr || r.stdout || "").trim().split("\n").slice(0, 4).join(" | ");
+    fallo(`${rutaRel}: ${salida || `salió con código ${r.status} sin producir salida`}`);
+    return;
+  }
+  // Verificación PARCIAL ≠ verificación completa. Varias suites omiten su
+  // parte de integración cuando falta una dependencia opcional (Playwright) y
+  // lo dicen honestamente en su salida — pero al agregarlas aquí se veían
+  // idénticas a una suite verificada de punta a punta. Es el mismo fallo que
+  // en tier 2 contaba las suites omitidas como aprobadas: la suite individual
+  // era honesta, la agregación borraba el matiz.
+  const omitidas = r.stdout.split("\n").filter((l) => /^\s*omitido:/i.test(l)).length;
+  if (omitidas) parciales.push(`${nombre} (${omitidas} parte(s) omitida(s))`);
+  ok(`${nombre}: ${r.stdout.trim().split("\n").at(-1)}`);
 }
 
+await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
-await ejecutarPrueba("evals/inteligencia/benchmark-gstack.mjs", "Benchmark Comparativo gstack");
-await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
+await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
+await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
+await ejecutarPrueba("evals/legal/auditor.mjs", "Legal (auditor de procedencia)");
+await ejecutarPrueba("evals/nucleo/fuentes.mjs", "Fuentes oficiales");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");
+await ejecutarPrueba("evals/seguridad/hooks-activados.mjs", "Hooks Deterministas Activables");
+await ejecutarPrueba("evals/seguridad/guardia.mjs", "Guardia (probado por evasión)");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts-secundarios.mjs", "Seguridad Hosts Secundarios");
 await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
@@ -227,6 +315,7 @@ await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
 await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
+await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
@@ -237,5 +326,23 @@ if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);
   for (const f of fallos) console.error(`  ✗ ${f}`);
   process.exit(1);
+}
+// ── La suite no puede haber tocado la telemetría real del proyecto ─────────
+{
+  const trazaDespues = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+  if (trazaDespues !== trazaAntes) {
+    fallo(
+      `la suite escribió en la telemetría REAL (.fabrica/traza.jsonl creció ${trazaDespues - trazaAntes} bytes). ` +
+      `Los spans de prueba son indistinguibles de los reales y envenenan la observabilidad. ` +
+      `La eval culpable debe fijar REPOFIBE_TRAZA_DIR a un directorio temporal.`
+    );
+  } else ok("la suite no contamina la telemetría real del proyecto");
+}
+
+if (parciales.length) {
+  console.log(`\nVerificación PARCIAL en ${parciales.length} suite(s) — no cuentan como verificadas de punta a punta:`);
+  for (const p of parciales) console.log(`  · ${p}`);
+  console.log("  Causa habitual: Playwright no instalado (dependencia opcional).");
+  console.log("  Para cerrarlas: npm install playwright && npx playwright install chromium");
 }
 console.log("\nTodo verde. repofibe pasó las evals tier 1.");

@@ -2,6 +2,208 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.6.0] — 2026-07-25
+### RETRACTADO — el benchmark contra gstack era fabricado
+- **Se retractan las cifras "repofibe 94.8 / 100 vs gstack 53.4 / 100"**
+  publicadas en `docs/BENCHMARK-GSTACK.md` y anunciadas en la v0.4.2 de este
+  changelog como "victoria empírica". Nunca hubo tal medición. El arnés
+  `evals/inteligencia/benchmark-gstack.mjs` no ejecutaba gstack, no importaba
+  `juez.mjs` (no existió evaluación doble ciega), fijaba `eficacia: true` para
+  repofibe por constante y `tarea.id % 4 !== 0` para gstack, y producía Peak
+  RSS, tokens y latencia con `Math.random()` en rangos elegidos para ganar.
+  La tabla de 40 scores por tarea estaba escrita a mano.
+- **Agravante corregido:** ese arnés corría dentro de `evals/validar.mjs`, así
+  que la suite reportaba "Todo verde" certificando la ficción — generar
+  aleatorios nunca falla, luego esa prueba no podía ponerse en rojo jamás.
+- **Eliminado** `evals/inteligencia/benchmark-gstack.mjs`.
+- **Conservado** lo que sí era trabajo real, en `evals/inteligencia/modelo-scoring.mjs`:
+  el catálogo de 20 tareas y la fórmula `calcularScore`, ahora probada con
+  vectores conocidos (casos límite, saturación y determinismo) en vez de
+  ejercitada con aleatorios. Nuevo `puntuarComparacion()` que **rechaza**
+  puntuar sin mediciones que declaren su procedencia: sin corrida no hay cifra.
+- **Nuevo guardia determinista** en `evals/validar.mjs`: falla si aparece
+  aleatoriedad en cualquier archivo de `evals/`. Una suite de medición que usa
+  `Math.random` está fabricando datos o es no determinista, y ninguna de las
+  dos es aceptable. Probado que detecta la recaída (se introdujo una violación
+  a propósito, falló, se retiró, pasó). En `nucleo/` sigue siendo legítimo
+  (generación de ids) y el guardia no llega ahí.
+- **`docs/PLAN-SUPERACION.md`**: las métricas de superioridad vuelven de
+  `[IMPLEMENTADA]` a `[PLANEADA]`. `docs/BENCHMARK-GSTACK.md` es ahora la
+  retractación, con el diff entre lo afirmado y lo real, y los cinco
+  requisitos para una comparación defendible.
+- Lo que sí está demostrado de repofibe no dependía de ese benchmark y se
+  mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
+  que las evals encontraron antes de publicar.
+
+### Corregido — el guardia se evadía con las formas más comunes, y `/guardian` estaba muerta
+Hallazgos de la auditoría por evasión (2026-07-25) sobre el hook que el repo
+presenta como su ventaja central. Ambos estuvieron **invisibles mientras los
+hooks no corrían en ninguna instalación real**; activarlos los destapó.
+
+- **CRÍTICO — el guardia dejaba pasar `rm -r -f` y `rm --recursive --force`.**
+  El regex exigía que `r` y `f` estuvieran en el MISMO token, así que dos de
+  las formas más comunes de escribir el comando pasaban sin pedir
+  confirmación. El usuario creía tener una protección que no tenía.
+- **Otros destructivos que no se detectaban:** `git checkout -- .` y
+  `git restore .` (descartan TODO el trabajo sin commitear, la misma clase que
+  `git reset --hard`), `git stash clear/drop`, `find -delete`, `find -exec rm`,
+  `shred`, `truncate -s 0`, `chmod -R 000`.
+- **`/guardian` estaba MUERTA.** Sus cuatro comandos ("guardián on/off",
+  "congela a `<dir>`", "descongela") consisten en escribir
+  `.fabrica/guardia.json` o `congelar.json`, y el hook denegaba esa escritura
+  en bloque. La skill no podía hacer absolutamente nada de lo que prometía.
+- **El arreglo no es quitar el candado, es hacerlo asimétrico por dirección.**
+  Encender el guardia o congelar un directorio deja al usuario MÁS protegido:
+  pasa sin fricción. Apagarlo, descongelar, o un cambio cuya dirección no se
+  puede determinar: `ask`, que le pide su aprobación explícita — que era lo
+  que el `deny` pretendía lograr, sin romper la skill. Un `deny` que obliga a
+  editar JSON a mano termina en usuarios que no configuran nada.
+- **`evals/seguridad/guardia.mjs` (nuevo).** Prueba los dos criterios con el
+  mismo peso: que **detenga** (18 destructivos, incluidas todas las evasiones
+  encontradas) y que **no estorbe** (16 comandos cotidianos, incluido
+  `--force-with-lease`, deben pasar sin alerta). Un guardia ruidoso se apaga a
+  la semana, y un guardia apagado protege cero.
+
+### Añadido — `/legal` deja de ser prompt puro: auditor determinista de procedencia
+- **El problema.** `/legal` era **100% clase 3**: todas sus garantías vivían en
+  el texto de `SKILL.md` ("nunca inventes cifras", "verifica antes de afirmar").
+  Un modelo potente lo cumple casi siempre; uno débil lo cumple a medias. Y en
+  materia legal "a medias" es una cifra o un artículo inventado que suena
+  perfectamente creíble — el daño real que la skill promete evitar. La eval
+  existente validaba el TEXTO de la skill, nunca una respuesta.
+- **`nucleo/legal.mjs`.** La IA redacta; el módulo audita el borrador antes de
+  entregarlo. Funciona igual con cualquier modelo porque no depende de que el
+  modelo recuerde nada. Detecta montos, porcentajes, artículos, normas y
+  afirmaciones de vigencia **sin procedencia declarada**, y marca como
+  **crítico** lo que contradice una cifra ya verificada.
+- **Contrato de marcas:** cada afirmación de riesgo lleva en su línea
+  `[verificado: <fuente> <fecha>]`, `[del documento]` o `[no verificado]`.
+  El módulo no juzga si el dato es correcto —un regex no puede— sino si el
+  borrador declara de dónde salió. `[no verificado]` es una marca válida: la
+  skill no está obligada a saberlo todo, sino a no fingir que lo sabe.
+- **Registro de cifras verificadas** (`legal-verificado.jsonl`): rechaza
+  fuentes fuera del allowlist oficial y procedencia incompleta. **Empieza
+  vacío a propósito** — precargarlo con el SMLMV de memoria sería cometer el
+  error que existe para impedir, y las cifras laborales caducan cada año.
+- **Dos bugs propios que encontró su eval antes de shipear:** (1) el patrón de
+  vigencia acusaba "necesito confirmar el texto **vigente**" — una frase que
+  CUESTIONA la vigencia, justo la conducta correcta; (2) los bloques de código
+  no se ignoraban de verdad, solo se saltaba la línea del cerco ` ``` ` y se
+  auditaba el contenido ilustrativo de adentro. Un auditor que castiga lo
+  correcto se desactiva a la semana.
+- **Conciencia de negación:** "no puedo afirmar que el artículo 64 diga eso" ya
+  no se acusa; la afirmación de la línea siguiente sí. Limitación documentada:
+  solo mira la misma línea.
+- `skills/legal/verificacion.md` (nuevo) con el contrato, ejemplos y límites.
+  `SKILL.md` incorpora la auditoría como **puerta obligatoria** antes de
+  entregar, y se compactó para caber bajo el techo de 12000 caracteres.
+
+### Añadido — blindaje: meta-evals que vigilan a las evals
+- **`evals/blindaje.mjs`.** Los dos fallos graves de esta versión no eran bugs
+  de lógica, eran el mismo patrón: *algo que se afirmaba funcionando, sin
+  ningún mecanismo capaz de detectar que no*. Arreglar los dos casos no impide
+  el tercero, así que ahora se vigila la clase entera:
+  1. **Toda eval debe poder ponerse en rojo.** Una prueba que no puede fallar
+     no prueba nada (era literalmente el benchmark fabricado).
+  2. **Ningún módulo del núcleo puede quedar huérfano.** `traza.mjs` estuvo
+     dos versiones escrito, probado y sin que lo llamara nadie.
+  3. **Toda referencia de una skill a `nucleo/*.mjs` debe existir.**
+  4. **Todo hook declarado debe existir**, y el matcher debe cubrir `Skill`.
+  Probado que detecta de verdad: se introdujo una eval decorativa y un módulo
+  huérfano, ambos fueron señalados, se retiraron, verde.
+- **Falso positivo propio corregido en el acto:** la primera versión acusó a
+  `tier2.mjs` por buscar el literal `process.exit(1)` sin reconocer
+  `process.exit(fallos ? 1 : 0)`. Un detector demasiado estrecho acusa a
+  pruebas sanas y erosiona la confianza en el guardia mismo.
+
+### Corregido — tres agujeros en los despachadores de evals
+- **Una eval borrada o renombrada desaparecía en silencio.** `validar.mjs`
+  hacía `if (!existsSync(ruta)) return;` — la suite seguía en verde por dejar
+  de correr una prueba. Es exactamente cómo el arnés fabricado podría haberse
+  esfumado sin que nadie lo notara. Ahora faltar es fallar.
+- **Los timeouts producían un mensaje vacío**, imposible de diagnosticar
+  (`✗ evals/x.mjs:` y nada más). Ahora se nombran como timeout, con su límite.
+  Límite subido de 30 s a 90 s: las suites crecieron.
+- **Tier 2 contaba las suites OMITIDAS como aprobadas.** `skills-criticas`
+  sale sin `ANTHROPIC_API_KEY` y el despachador reportaba "todo verde, 2
+  suites pasaron". Ahora hay tres estados —pasó / omitida / falló— y las
+  omitidas se declaran no verificadas.
+
+### Verificado — la cadena del sprint funciona de punta a punta
+- `evals/e2e/sprint-completo.mjs` ejecuta los 8 pasos pensar→retro con
+  transiciones de estado reales, repositorio git real, grafo de dependencias,
+  selección de pruebas afectadas y checkpoints. No es prosa: corre.
+
+### Corregido — los guardias deterministas estaban APAGADOS en instalaciones reales
+- **El hallazgo:** en una instalación real, las 33 skills estaban puestas pero
+  `guardia.mjs` y `sesion.mjs` **nunca habían corrido**. El guardia
+  determinista —la pieza que ARQUITECTURA.md presenta como la ventaja central
+  del proyecto, la "clase 1"— llevaba versiones apagado, en silencio.
+- **La causa raíz:** el instalador intenta primero el plugin nativo (única vía
+  que carga `hooks.json`) y, si la CLI de `claude` no está disponible, cae a
+  "modo copia", que instala skills pero no hooks. Y la rama de refresco
+  detectaba la instalación previa en copia, copiaba skills y **volvía sin
+  reintentar los hooks ni reimprimir el aviso**. El fallback era pegajoso y
+  mudo: una vez en copia, jamás se salía.
+- **El arreglo:** `node nucleo/instalar.mjs --hooks` registra los hooks en
+  `~/.claude/settings.json`, que Claude Code lee sin depender del sistema de
+  plugins. Y ahora el refresco los reactiva siempre, en vez de volver callado.
+- Merge cuidadoso sobre configuración del usuario: idempotente (identidad por
+  nombre de hook, no por comando exacto), preserva permisos, modelo y hooks de
+  otros plugins, respalda **el original una sola vez** (`.bak-repofibe`),
+  escritura atómica, y **no toca** un `settings.json` que no pueda parsear.
+- **Dos bugs propios encontrados por la eval antes de shipear:** la primera
+  versión duplicaba las entradas en cada ejecución (la marca de identidad
+  incluía una comilla que `JSON.stringify` escapa como `\"`, así que nunca
+  coincidía), y el respaldo se sobrescribía con la versión ya modificada,
+  perdiendo el original del usuario.
+- **Eval nueva** `evals/seguridad/hooks-activados.mjs`: activación, matcher con
+  `Skill`, idempotencia, preservación de la config del usuario, integridad del
+  respaldo, y que un `settings.json` corrupto quede intacto.
+
+### Añadido — telemetría local: la fábrica por fin se mide a sí misma
+- **`nucleo/traza.mjs` cableado a los hooks.** Estaba escrito desde v0.4.0 y
+  no lo usaba nadie, así que no existía un solo dato real de qué skills se
+  usan, cuáles fallan o cuáles son peso muerto. `guardia.mjs` ya corría en
+  cada uso de herramienta: es el sensor natural, sin pagar otro proceso.
+- **`Skill` añadido al matcher de PreToolUse** — sin eso las invocaciones de
+  skills eran invisibles, que era justo el dato que hacía falta.
+- **Solo metadatos, nunca contenido.** Se guarda marca de tiempo, tipo,
+  nombre de herramienta/skill y decisión del guardia. No se guardan comandos,
+  rutas, argumentos ni prompts: un comando de shell puede llevar una
+  credencial y esto escribe a disco. Lista blanca en el código; la eval
+  intenta colar un secreto y verifica que no llega al archivo.
+- **Tres bugs de `traza.mjs` corregidos antes de cablearlo:**
+  1. Importarlo instalaba handlers de `uncaughtException` (forzaba exit 1) y
+     de SIGINT/SIGTERM. Un hook fail-open no puede heredar eso — `guardia.mjs`
+     habría podido romper la sesión del usuario. Ahora son opt-in vía
+     `instalarRedDeSeguridad()`; solo queda el de `exit`, que es síncrono y no
+     puede alterar el código de salida.
+  2. La ruta se resolvía con `process.cwd()` al importar, no al llamar. Un
+     hook recibe su cwd en el payload y puede no coincidir.
+  3. El buffer asíncrono (lotes de 20 / 500 ms) pierde datos en un proceso que
+     vive 30 ms. Los hooks usan `registrar()`, escritura síncrona de un evento.
+- **Apagable** con `.fabrica/traza.json` → `{"activo": false}`. Local y
+  gitignorada; cero telemetría remota, sin cambios en esa promesa.
+- **Lectura:** `node nucleo/traza.mjs ver [n]` — últimos eventos y ranking de
+  uso. `inspeccionar <id>` sigue dando el árbol de una traza.
+- **Eval reescrita** (`evals/nucleo/traza.mjs`), 9 verificaciones que ejecutan
+  el hook de verdad: anidación, lista blanca anti-fuga, truncado, apagado,
+  fallo silencioso, registro real vía `guardia.mjs`, y que **el guardia siga
+  pidiendo confirmación ante `rm -rf` incluso con la traza rota**. Antes
+  escribía en el `.fabrica` del repo real; ahora usa directorio temporal.
+
+### Añadido — evals tier 2 end-to-end
+- `evals/e2e/skills-criticas.mjs`: invoca 5 skills críticas con su `SKILL.md`
+  real como system prompt y las somete a un juez de veredicto binario. Actor y
+  juez con **Opus 5**: un juez débil aprueba respuestas mediocres, y una eval
+  que miente es peor que no tener eval. Job manual con `ANTHROPIC_API_KEY`,
+  nunca CI, porque cuesta dinero por corrida y eso se declara.
+
+### Añadido — plan v1.0
+- `docs/fabrica/2026-07-25-plan-lazo-cerrado.md`: la fábrica se mide a sí
+  misma. Diagnóstico, fases por dependencia y criterios de "funcionó".
+
 ## [0.5.2] — 2026-07-19
 ### Añadido — `/legal` ahora experto en derecho laboral colombiano
 - **Derecho laboral en todos sus ámbitos** (`skills/legal/laboral.md`, nueva

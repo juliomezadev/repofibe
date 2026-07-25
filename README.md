@@ -64,10 +64,31 @@ IDE: `--host generico --workspace <ruta>` (skills + bloque en AGENTS.md).
 - **Desinstalar:** `instalar.ps1 -Quitar` / `./instalar.sh --quitar` — limpia
   todo lo que instaló (lo registra en `~/.repofibe/instalado.json`).
 
-En Claude Code el camino preferido es el plugin nativo (incluye los hooks
-deterministas): `claude plugin marketplace add <ruta-al-clon>` y
-`claude plugin install repofibe@repofibe-marketplace` — el instalador lo
-intenta automáticamente.
+### Los hooks deterministas (verifica que estén activos)
+
+Los guardias de clase 1 —confirmación ante comandos destructivos, congelamiento
+de directorio, contexto al abrir sesión— viven en hooks, y los hooks **no se
+cargan con solo copiar las skills**.
+
+```bash
+node nucleo/instalar.mjs --hooks   # actívalos y reinicia Claude Code
+```
+
+Es idempotente y seguro: registra los hooks en `~/.claude/settings.json`
+respetando tu configuración y la de otros plugins, respalda tu archivo original
+en `settings.json.bak-repofibe` y no toca nada si el JSON está corrupto.
+
+El camino alternativo es el plugin nativo, que trae los hooks incluidos:
+`claude plugin marketplace add <ruta-al-clon>` y
+`claude plugin install repofibe@repofibe-marketplace`. El instalador lo intenta
+solo, pero si la CLI de `claude` está ocupada cae a modo copia — y en modo copia
+los hooks hay que activarlos con el comando de arriba.
+
+> **Esto no es teórico.** En la instalación del propio autor, las 33 skills
+> estaban puestas y los hooks llevaban versiones sin correr: el guardia
+> determinista, la ventaja central del proyecto, estaba apagado en silencio
+> porque el fallback a modo copia nunca se reintentaba. Corregido en v0.6.0,
+> con eval que lo fija (`evals/seguridad/hooks-activados.mjs`).
 
 ## El ciclo del sprint
 
@@ -120,6 +141,37 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 - **Memoria global**: `~/.repofibe/memoria.jsonl` — te sigue entre proyectos.
 - En Claude Code, un hook SessionStart inyecta este contexto al abrir la
   sesión: la fábrica nunca empieza de cero.
+
+## Telemetría local (qué se guarda y cómo apagarla)
+
+La fábrica anota su propio uso en `.fabrica/traza.jsonl` para poder responder
+con datos —y no con intuición— qué skills se usan, cuáles fallan y cuáles son
+peso muerto.
+
+```bash
+node nucleo/traza.mjs ver 20            # últimos eventos + más frecuentes
+node nucleo/traza.mjs inspeccionar <id> # árbol de una traza concreta
+```
+
+Qué se guarda, exactamente:
+
+```jsonl
+{"ts":1784963646117,"ev":"skill","n":"legal","d":"permitir"}
+{"ts":1784963647349,"ev":"herramienta","n":"Bash","d":"ask"}
+```
+
+Marca de tiempo, tipo de evento, nombre de la herramienta o skill, y la
+decisión del guardia. **Nada más.** No se guardan comandos, rutas de archivo,
+argumentos ni prompts: un comando de shell puede llevar una credencial dentro
+y esto escribe a disco. El filtro es una lista blanca en el código, no una
+buena intención — `evals/nucleo/traza.mjs` lo verifica intentando colar un
+secreto y comprobando que no llega al archivo.
+
+- **Local y tuya.** `.fabrica/` está gitignorado y no sale de tu máquina.
+  Cero telemetría remota, por diseño.
+- **Se apaga** con `.fabrica/traza.json` → `{"activo": false}`.
+- **Nunca estorba.** Si no puede escribir, falla en silencio; los hooks
+  siguen funcionando igual (probado con la traza deliberadamente rota).
 
 ## Calidad del propio repo
 

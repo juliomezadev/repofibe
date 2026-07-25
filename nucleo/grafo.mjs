@@ -41,14 +41,30 @@ function archivosCodigo(dir, base, salida) {
   return salida;
 }
 
+// Quita comentarios antes de buscar imports. Sin esto, un import comentado o
+// escrito dentro de un string se contaba como dependencia real (encontrado
+// auditando, 2026-07-25): infla el conjunto de impacto y hace correr pruebas
+// que no hacía falta correr. No se tocan los strings en general porque el
+// especificador de un import ES un string; los casos "import dentro de un
+// string" se descartan exigiendo posición de sentencia en el patrón de abajo.
+function quitarComentarios(texto) {
+  return texto
+    .replace(/\/\*[\s\S]*?\*\//g, " ")      // bloque
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");  // línea (el [^:] evita romper https://)
+}
+
 // Extrae especificadores de import/require de un archivo (regex, aproximado).
-function extraerImports(texto, esPython) {
+function extraerImports(textoCrudo, esPython) {
+  const texto = quitarComentarios(textoCrudo);
   const encontrados = [];
   if (esPython) {
     for (const m of texto.matchAll(/^\s*from\s+([.\w]+)\s+import\b/gm)) encontrados.push(m[1]);
     for (const m of texto.matchAll(/^\s*import\s+([.\w]+)/gm)) encontrados.push(m[1]);
   } else {
-    for (const m of texto.matchAll(/(?:import|export)[^'"`;]*?from\s*['"`]([^'"`]+)['"`]/g)) encontrados.push(m[1]);
+    // Anclado a inicio de línea (`^\s*`): un `import ... from '...'` escrito
+    // DENTRO de un string (`const t = "import x from './core'"`) no empieza
+    // la línea y ya no se cuenta como dependencia.
+    for (const m of texto.matchAll(/^\s*(?:import|export)[^'"`;]*?from\s*['"`]([^'"`]+)['"`]/gm)) encontrados.push(m[1]);
     for (const m of texto.matchAll(/\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) encontrados.push(m[1]);
     for (const m of texto.matchAll(/\brequire\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g)) encontrados.push(m[1]);
     for (const m of texto.matchAll(/^\s*import\s+['"`]([^'"`]+)['"`]/gm)) encontrados.push(m[1]);
@@ -56,13 +72,57 @@ function extraerImports(texto, esPython) {
   return encontrados;
 }
 
+// Alias de tsconfig/jsconfig (`compilerOptions.paths`). Sin esto, un proyecto
+// Next/Vite/TS normal —donde `@/x` es la forma habitual de importar— perdía
+// esas aristas del grafo. Consecuencia real y grave: `pruebas.mjs afectadas`
+// dejaba fuera pruebas que SÍ estaban afectadas, o sea shipear roto creyendo
+// que se probó. Encontrado auditando el 2026-07-25.
+let ALIAS = null;
+function alias() {
+  if (ALIAS) return ALIAS;
+  ALIAS = [];
+  for (const archivo of ["tsconfig.json", "jsconfig.json"]) {
+    try {
+      const crudo = readFileSync(join(RAIZ, archivo), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")       // tsconfig admite comentarios
+        .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
+        .replace(/,(\s*[}\]])/g, "$1");         // y comas colgantes
+      const cfg = JSON.parse(crudo);
+      const paths = cfg?.compilerOptions?.paths ?? {};
+      const baseUrl = (cfg?.compilerOptions?.baseUrl ?? ".").replace(/^\.\//, "").replace(/\/$/, "");
+      for (const [patron, destinos] of Object.entries(paths)) {
+        for (const destino of [].concat(destinos)) {
+          ALIAS.push({
+            prefijo: patron.replace(/\*$/, ""),
+            comodin: patron.endsWith("*"),
+            destino: norm(join(baseUrl === "." ? "" : baseUrl, destino.replace(/\*$/, "").replace(/^\.\//, ""))),
+          });
+        }
+      }
+    } catch { /* sin tsconfig, o ilegible: se sigue sin alias */ }
+  }
+  return ALIAS;
+}
+
+// Prueba las extensiones e índices habituales contra los archivos del proyecto.
+function candidatosDe(base, conjunto) {
+  const candidatos = [base, ...[".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"].map((e) => base + e),
+    ...["index.js", "index.ts", "index.mjs", "index.jsx", "index.tsx", "__init__.py"].map((i) => base + "/" + i)];
+  return candidatos.find((c) => conjunto.has(c)) ?? null;
+}
+
 // Resuelve un especificador relativo a un archivo real del proyecto.
 function resolver(espec, desde, conjunto) {
   if (espec.startsWith(".")) {
-    const base = norm(join(dirname(desde), espec));
-    const candidatos = [base, ...[".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"].map((e) => base + e),
-      ...["index.js", "index.ts", "index.mjs", "index.jsx", "index.tsx", "__init__.py"].map((i) => base + "/" + i)];
-    return candidatos.find((c) => conjunto.has(c)) ?? null;
+    return candidatosDe(norm(join(dirname(desde), espec)), conjunto);
+  }
+
+  // Alias antes de darlo por paquete externo.
+  for (const a of alias()) {
+    if (!espec.startsWith(a.prefijo)) continue;
+    const resto = a.comodin ? espec.slice(a.prefijo.length) : "";
+    const encontrado = candidatosDe(norm(join(a.destino, resto)), conjunto);
+    if (encontrado) return encontrado;
   }
   // Python: from paquete.modulo import → paquete/modulo.py
   if (/^[\w.]+$/.test(espec) && desde.endsWith(".py")) {

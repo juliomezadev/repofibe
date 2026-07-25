@@ -54,7 +54,7 @@ async function probarPerfilSiHayPlaywright() {
   try { pw = await import("playwright"); }
   catch {
     console.log("omitido: playwright no está instalado en este proyecto (repofibe es cero-deps) — instala con `npm install playwright && npx playwright install chromium` para correr esta prueba de integración real");
-    return;
+    return false; // el llamador NO debe anunciar que verificó Chromium
   }
 
   // Servidor local que muestra las cookies recibidas
@@ -107,6 +107,7 @@ async function probarPerfilSiHayPlaywright() {
   }
 
   servidor.close();
+  return true; // sí se ejecutó contra Chromium real
 }
 
 try {
@@ -114,8 +115,13 @@ try {
   console.log("ok: normalización de dominio (protocolo, www, ruta, mayúsculas)");
   probarCargarListarRetirar();
   console.log("ok: ciclo completo (cargar con normalización, listar, retirar, doble retirar)");
-  await probarPerfilSiHayPlaywright();
-  console.log("ok: acción perfil + navegador.mjs inyecta storageState en Chromium real");
+  // Antes esta línea se imprimía SIEMPRE, incluso con Playwright ausente:
+  // la eval afirmaba haber verificado la inyección en Chromium sin haber
+  // ejecutado nada. Afirmar una verificación que no ocurrió es el mismo
+  // patrón que motivó la retractación del benchmark, en pequeño.
+  if (await probarPerfilSiHayPlaywright()) {
+    console.log("ok: acción perfil + navegador.mjs inyecta storageState en Chromium real");
+  }
   console.log("Cookies: funciones puras verificadas siempre; integración con Chromium verificada si Playwright está disponible.");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });

@@ -15,6 +15,7 @@ import {
   rmdirSync,
   readdirSync,
   lstatSync,
+  renameSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname, resolve, sep } from "node:path";
@@ -50,6 +51,7 @@ const quitar = args.includes("--quitar");
 const refrescar = args.includes("--refrescar");
 const adoptar = args.includes("--adoptar");
 const dryRun = args.includes("--dry-run");
+const soloHooks = args.includes("--hooks");
 
 if (dryRun) {
   console.log("=== EJECUCIÓN EN MODO DRY-RUN ===");
@@ -361,6 +363,111 @@ function anotarPlugin(registro, nombre) {
   if (!registro.plugins.includes(nombre)) registro.plugins.push(nombre);
 }
 
+// ── Hooks sin plugin nativo ─────────────────────────────────────────────────
+// El modo copia instala las skills pero NO los hooks, porque hooks.json solo
+// lo lee el sistema de plugins. Resultado real observado (2026-07-25): una
+// instalación que cayó al fallback de copia dejó los guardias deterministas
+// —la pieza central de la arquitectura— apagados para siempre, en silencio,
+// porque cada --refrescar volvía a entrar por la rama de copia sin reintentar
+// ni avisar.
+//
+// Claude Code también lee hooks de ~/.claude/settings.json, así que ahí se
+// registran, con rutas absolutas a este checkout. Idempotente: se identifica
+// cada entrada por su comando, de modo que reinstalar actualiza en vez de
+// duplicar. Se respalda el archivo antes de tocarlo: es configuración del
+// usuario con mucho dentro, y un merge mal hecho le rompería el entorno.
+const RUTA_SETTINGS = join(HOGAR, ".claude", "settings.json");
+
+function entradasHook() {
+  const cmd = (archivo) => `node "${join(RAIZ, "hooks", archivo).replaceAll("\\", "/")}"`;
+  return {
+    PreToolUse: {
+      archivo: "guardia.mjs",
+      entrada: {
+        matcher: "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|Skill",
+        hooks: [{ type: "command", command: cmd("guardia.mjs") }],
+      },
+    },
+    SessionStart: {
+      archivo: "sesion.mjs",
+      entrada: {
+        matcher: "startup|resume",
+        hooks: [{ type: "command", command: cmd("sesion.mjs") }],
+      },
+    },
+  };
+}
+
+function activarHooksClaude(registro) {
+  if (!existe(join(HOGAR, ".claude"))) {
+    console.log("  hooks: no hay ~/.claude (Claude Code no detectado) - omitido");
+    return false;
+  }
+
+  let settings = {};
+  const existia = existe(RUTA_SETTINGS);
+  if (existia) {
+    try {
+      settings = JSON.parse(readFileSync(RUTA_SETTINGS, "utf8"));
+    } catch (e) {
+      console.warn(`  hooks: ${RUTA_SETTINGS} no es JSON válido - NO se toca (${e.message})`);
+      return false;
+    }
+  }
+
+  const deseadas = entradasHook();
+  settings.hooks = settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {};
+  let cambios = 0;
+
+  for (const [evento, { archivo, entrada }] of Object.entries(deseadas)) {
+    const lista = Array.isArray(settings.hooks[evento]) ? settings.hooks[evento] : [];
+    // Identidad por NOMBRE del hook, no por comando exacto: así una ruta que
+    // cambió (repo movido) se actualiza en vez de duplicarse. Sin comillas en
+    // la marca a propósito — JSON.stringify las escapa como \" y una marca que
+    // las incluyera no coincidiría nunca (bug real, detectado por la eval:
+    // la primera versión duplicaba las entradas en cada ejecución).
+    const marca = `hooks/${archivo}`;
+    const i = lista.findIndex((e) => JSON.stringify(e).includes(marca));
+    if (i >= 0) {
+      if (JSON.stringify(lista[i]) === JSON.stringify(entrada)) continue;
+      lista[i] = entrada;
+    } else {
+      lista.push(entrada);
+    }
+    settings.hooks[evento] = lista;
+    cambios++;
+  }
+
+  if (!cambios) {
+    console.log("  hooks: ya estaban registrados y al día en settings.json");
+    return true;
+  }
+
+  if (dryRun) {
+    console.log(`[DRY-RUN] registraría ${cambios} hook(s) en ${RUTA_SETTINGS}`);
+    return true;
+  }
+
+  const serializado = JSON.stringify(settings, null, 2) + "\n";
+  JSON.parse(serializado); // no escribir algo que no se puede releer
+
+  // El respaldo se hace UNA sola vez: conserva el settings.json original del
+  // usuario, no la última versión ya modificada por repofibe.
+  const respaldo = `${RUTA_SETTINGS}.bak-repofibe`;
+  if (existia && !existe(respaldo)) {
+    writeFileSync(respaldo, readFileSync(RUTA_SETTINGS, "utf8"), "utf8");
+    console.log(`  respaldo del original -> ${respaldo}`);
+  }
+  const tmp = `${RUTA_SETTINGS}.tmp-repofibe`;
+  writeFileSync(tmp, serializado, "utf8");
+  renameSync(tmp, RUTA_SETTINGS); // atómico: nunca un settings.json a medias
+
+  if (registro) registrarBloque(registro, RUTA_SETTINGS, hashTexto(serializado), !existia);
+  console.log(`  hooks deterministas ACTIVADOS en ${RUTA_SETTINGS} (${cambios} evento(s))`);
+  console.log("  reinicia Claude Code para que los cargue.");
+  return true;
+}
+
 // Desinstala solo archivos cuyo hash demuestra que siguen siendo la copia creada.
 function quitarArchivoPropio(registro, propiedad) {
   const ruta = resolve(propiedad.ruta);
@@ -431,6 +538,11 @@ const HOSTS = {
       if (yaEnCopias) {
         copiarSkills(registro, join(HOGAR, ".claude", "skills"));
         console.log("  (refresco en modo copia - instalacion previa detectada)");
+        // Los hooks se reactivan SIEMPRE en cada refresco. Antes esta rama
+        // solo copiaba skills y volvia, de modo que una instalacion que cayo
+        // al fallback de copia dejaba los guardias deterministas apagados en
+        // silencio para siempre: ningun --refrescar los reintentaba ni avisaba.
+        activarHooksClaude(registro);
         return;
       }
       try {
@@ -443,7 +555,7 @@ const HOSTS = {
         console.log("  CLI de claude no disponible u ocupada - fallback a copia de skills");
       }
       copiarSkills(registro, join(HOGAR, ".claude", "skills"));
-      console.log("  AVISO: en modo copia los hooks no se cargan. Para guardias deterministas: claude plugin marketplace add <ruta-repofibe> && claude plugin install repofibe@repofibe-marketplace");
+      activarHooksClaude(registro);
     },
   },
   antigravity: {
@@ -585,6 +697,15 @@ if (elegidos.some((h) => !HOSTS[h])) {
 }
 
 const registro = leerRegistro();
+
+// --hooks: solo activar los guardias deterministas, sin tocar skills.
+if (soloHooks) {
+  console.log("Activando hooks deterministas de repofibe en Claude Code...");
+  const ok = activarHooksClaude(registro);
+  guardarRegistro(registro);
+  process.exit(ok ? 0 : 1);
+}
+
 instalarApp(registro);
 for (const h of elegidos) {
   console.log(`\n[${h}]`);

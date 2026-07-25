@@ -169,7 +169,22 @@ async function procesarBuscadorBase() {
         .sort((a, b) => b.rrf - a.rrf || (a.fecha < b.fecha ? 1 : -1))
         .slice(0, max);
         
-      if (!puntuados.length) { console.log("Sin resultados en memoria."); break; }
+      // Degradación ANUNCIADA, no silenciosa. Sin `@xenova/transformers` la
+      // búsqueda es puramente textual: no encuentra sinónimos. Decir solo
+      // "Sin resultados en memoria" es engañoso — la memoria puede tener la
+      // entrada relevante y ser la BÚSQUEDA la que no llega. El usuario
+      // merece saber cuál de las dos cosas pasó (encontrado auditando,
+      // 2026-07-25: "mensajes concurrentes desordenados" no recuperaba una
+      // nota sobre "correlacionar respuestas en IPC asíncrono").
+      if (!puntuados.length) {
+        console.log("Sin resultados en memoria.");
+        if (!usamosVectores) {
+          console.log("  (búsqueda TEXTUAL: no encuentra sinónimos ni paráfrasis.");
+          console.log("   Para búsqueda semántica: npm install @xenova/transformers)");
+        }
+        break;
+      }
+      if (!usamosVectores) console.log("[búsqueda textual — sin motor semántico instalado]");
       for (const e of puntuados) mostrar(e, e.origen);
       break;
     }

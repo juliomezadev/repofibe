@@ -37,29 +37,28 @@ PROHIBIDO:
 
 ## Paso 0 — Límites de integración y fuentes
 
-Esta skill no contiene un adaptador real para plugins legales del host. No
-declares integración automática ni ejecución de herramientas externas salvo que
-el host las exponga explícitamente y la sesión demuestre que fueron ejecutadas.
-Una herramienta auxiliar nunca sustituye la verificación en una fuente oficial
-allowlisted.
+Esta skill no tiene adaptador para plugins legales del host: no declares
+integración automática ni ejecución de herramientas externas salvo que el host
+las exponga y la sesión demuestre que corrieron. Ninguna herramienta sustituye
+la verificación en fuente oficial allowlisted.
 
 ### Allowlist de fuentes oficiales
 
-Solo considera fuente oficial una URL HTTPS cuyo host sea uno de estos dominios
-o un subdominio de ellos. La allowlist limita el origen; no demuestra por sí
-sola la vigencia ni el contenido de una afirmación.
+Solo es fuente oficial una URL HTTPS cuyo host sea uno de estos dominios o un
+subdominio suyo. La allowlist limita el origen; no demuestra vigencia ni
+contenido.
 
-| Autoridad o repositorio | Host allowlisted | Uso orientativo dentro del mapa existente |
+| Autoridad | Host allowlisted | Uso |
 |---|---|---|
-| SUIN-Juriscol | `suin-juriscol.gov.co` | Texto y estado de normas colombianas |
-| Superintendencia de Industria y Comercio | `sic.gov.co` | Protección de datos, RNBD y actuaciones de la SIC |
-| Dirección de Impuestos y Aduanas Nacionales | `dian.gov.co` | Facturación electrónica y obligaciones de la DIAN |
-| Dirección Nacional de Derecho de Autor | `derechodeautor.gov.co` | Derecho de autor y registro ante la DNDA |
-| Comunidad Andina | `comunidadandina.org` | Instrumentos andinos ya incluidos en el mapa |
-| Ministerio del Trabajo | `mintrabajo.gov.co` | Normativa/conceptos laborales, inspección del trabajo |
-| Función Pública (gestor normativo) | `funcionpublica.gov.co` | Texto y vigencia del CST y normas laborales |
-| Corte Suprema (Sala Laboral) | `cortesuprema.gov.co` | Jurisprudencia laboral |
-| DANE | `dane.gov.co` | IPC y datos oficiales para cálculos/reajustes |
+| SUIN-Juriscol | `suin-juriscol.gov.co` | Texto y estado de normas |
+| SIC | `sic.gov.co` | Datos personales, RNBD |
+| DIAN | `dian.gov.co` | Facturación electrónica |
+| DNDA | `derechodeautor.gov.co` | Derecho de autor |
+| Comunidad Andina | `comunidadandina.org` | Instrumentos andinos |
+| MinTrabajo | `mintrabajo.gov.co` | Normativa laboral, inspección |
+| Función Pública | `funcionpublica.gov.co` | Texto y vigencia del CST |
+| Corte Suprema | `cortesuprema.gov.co` | Jurisprudencia laboral |
+| DANE | `dane.gov.co` | IPC para cálculos y reajustes |
 
 Reglas para cada fuente:
 
@@ -113,10 +112,9 @@ Confianza y escalamiento
 - Verifícalo con abogado colombiano: sí | no, y por qué:
 ```
 
-La sección **Norma del mapa** describe la fuente. La sección **Inferencia y
-límites** explica el razonamiento del asistente. Nunca las mezcles. Si una
-fuente no está verificada, conserva la entrada del mapa como índice de
-orientación y etiqueta cualquier resultado como `no verificado`.
+**Norma del mapa** describe la fuente; **Inferencia y límites** el razonamiento
+propio. Nunca las mezcles. Sin fuente verificada, el mapa queda como índice y
+todo resultado se etiqueta `no verificado`.
 
 ## Mapa normativo (índice de orientación, no texto legal)
 
@@ -176,6 +174,24 @@ documento COMPLETO antes de opinar.
    contrato relevante, datos sensibles o de menores, posible delito,
    controversia, fuentes contradictorias o conclusión no verificable.
 
+## Auditoría de procedencia — PUERTA OBLIGATORIA antes de entregar
+
+Todo lo anterior es prompt: se cumple si el modelo está atento. La garantía
+real es código. Antes de entregar, escribe el borrador a un archivo y córrelo:
+
+```text
+node <RAIZ>/nucleo/legal.mjs auditar <borrador.md>
+```
+
+Marca **en su misma línea** cada monto, porcentaje, artículo, norma y
+afirmación de vigencia con su procedencia:
+`[verificado: <fuente> <fecha>]` · `[del documento]` · `[no verificado]`.
+
+Si el auditor reporta riesgos, **corrígelos antes de entregar** — no los
+expliques al usuario. `[no verificado]` es una marca válida: no estás obligado
+a saberlo todo, estás obligado a no fingir que lo sabes. Detalle, ejemplos y
+registro de cifras verificadas: `verificacion.md` (misma carpeta).
+
 ## Criterio de cierre
 
 No cierres con "cumple", "es legal" o "es ilegal" si falta una fuente oficial
@@ -185,15 +201,14 @@ decir `no concluyente`, enumerar la verificación pendiente y recomendar:
 
 ## Entregables típicos
 
-- **Checklist de cumplimiento** para lanzar una app en Colombia (datos +
-  consumidor + facturación), con fuente, fecha y vigencia por cada afirmación.
-- **Revisión de términos y condiciones / política de privacidad** contra las
-  entradas aplicables del mapa, separando texto normativo de inferencias.
-- **Semáforo de scraping/pentesting**: qué está respaldado por la fuente, qué
-  es incumplimiento contractual y qué permanece como zona de riesgo.
-- **Cláusulas mínimas** para contrato de desarrollo de software (cesión de
-  derechos, confidencialidad, entregables, garantía), siempre con escalamiento
-  a abogado cuando el contrato sea vinculante.
+- **Checklist de cumplimiento** para lanzar en Colombia (datos + consumidor +
+  facturación), con fuente, fecha y vigencia por afirmación.
+- **Revisión de términos y política de privacidad** contra el mapa, separando
+  texto normativo de inferencias.
+- **Semáforo de scraping/pentesting**: qué respalda la fuente, qué es
+  incumplimiento contractual y qué es zona de riesgo.
+- **Cláusulas mínimas** de contrato de desarrollo (cesión, confidencialidad,
+  entregables, garantía), con escalamiento a abogado si es vinculante.
 
 ## Al cerrar
 
@@ -202,6 +217,5 @@ node <RAIZ>/nucleo/estado.mjs registrar legal "<tema>: <conclusión calibrada en
 node <RAIZ>/nucleo/memoria.mjs agregar decision "<decisión legal tomada y su base normativa>"
 ```
 
-Si el análisis reveló un riesgo que el producto ya tiene en producción,
-créalo como pendiente: `estado.mjs pendiente "legal: <riesgo>"` — los riesgos
-legales no se resuelven olvidándolos.
+Si el análisis reveló un riesgo ya en producción, déjalo como pendiente:
+`estado.mjs pendiente "legal: <riesgo>"` — no se resuelven olvidándolos.
