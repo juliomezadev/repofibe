@@ -2,6 +2,56 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [0.6.1] — 2026-07-25
+### Corregido — la capacidad de navegador estaba MUERTA (6 bugs)
+Al instalar Playwright y Chromium por primera vez, las 4 suites que siempre se
+habían omitido se ejecutaron de verdad. Tres de cuatro fallaron. Ninguno de
+estos bugs lo encontró una eval, una revisión ni un modelo: los encontró
+**ejecutar el código**.
+
+- **CRÍTICO — `snapshotPagina is not defined`.** La función que toma el
+  snapshot de accesibilidad —cómo el agente *ve* la página— nunca existió.
+  `ejecutarComandoInseguroBase` la llamaba y lanzaba `ReferenceError`. Es la
+  operación central: sin ella `/qa`, `/scrape`, `/autenticar` y
+  `/design-review` **nunca funcionaron**. Cuatro skills anunciadas en el
+  README con una capacidad entera muerta desde que se escribió.
+- **`click` y `escribir` operaban sobre objetos planos.** Usaban
+  `refs[accion.ref]` como si fuera un locator de Playwright, pero `parsearRefs`
+  guarda `{role, name, indice}`. `localizador()` ya hacía la conversión y solo
+  la usaba `texto`: el módulo quedó a medio refactorizar.
+- **CUELGUE — navegador huérfano.** `ejecutarScript` lanzaba Chromium *antes*
+  de validar el perfil, y el `throw` por sesión ausente salía sin cerrarlo. El
+  proceso quedaba vivo manteniendo el event loop: el comando no fallaba, se
+  colgaba **para siempre**. Ahora la validación va antes de lanzar: falla en
+  1,1 s.
+- **La auto-curación abría una ventana a mitad de un QA desatendido.**
+  `qaonline` llamaba `guardar(dominio, state, dirBase)`, pero `guardar()` es
+  **interactiva** por diseño: abre Chromium visible para que una persona se
+  autentique a mano. Además el `state` iba en la posición de `dirBase`
+  (`ERR_INVALID_ARG_TYPE`). Nuevo `guardarEstado()`: persiste un storageState
+  ya exportado, sin interacción.
+- **`qaonline` moría si no había sesión guardada** — el caso exacto para el
+  que existe la auto-curación. Anteponía `perfil` siempre y `ejecutarScript`
+  lanzaba. Ahora solo lo antepone si hay sesión; si no, navega y deja que el
+  macro de login actúe.
+- **Tres campos que el módulo nunca publicaba** y las evals consumían:
+  `.refs` (había `refsCount`), `.texto` (había `dom`) y `.cookies` en la acción
+  `perfil` (no existía). Las aserciones comparaban contra `undefined`.
+  `perfil` además devolvía `ok:true` sin decir cuánto cargó: un perfil vacío
+  era indistinguible de uno cargado.
+
+**Resultado:** las 4 suites antes parciales corren completas. `benchmark` mide
+Core Web Vitals reales con Chromium (LCP 84 ms), y el **Self-Healing Auth de
+`/qaonline` se verifica de punta a punta por primera vez**.
+
+### Limitación conocida (no corregida)
+`qaonline` llama a `ejecutarScript([accion])` **una vez por acción**, y cada
+llamada lanza un navegador nuevo. El estado no persiste entre pasos: los refs
+de un `snapshot` no sobreviven al `click` siguiente. Los flujos que no dependen
+de refs entre pasos funcionan —y así lo verifica la eval—, pero los que sí,
+no. Se documenta en vez de silenciarse; el arreglo es un refactor de la
+orquestación, no un parche.
+
 ## [0.6.0] — 2026-07-25
 ### RETRACTADO — el benchmark contra gstack era fabricado
 - **Se retractan las cifras "repofibe 94.8 / 100 vs gstack 53.4 / 100"**

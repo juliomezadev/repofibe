@@ -2,7 +2,7 @@
 // qaonline.mjs — Orquestador de QA en Vivo con Self-Healing Auth y Evidencia Determinista.
 
 import { ejecutarScript } from "./navegador.mjs";
-import { guardar as guardarAuth } from "./cookies.mjs";
+import { guardarEstado as guardarAuth, cargar as cargarAuth } from "./cookies.mjs";
 import { withTrace, flushSyncEmergencia } from "./traza.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -22,9 +22,25 @@ export async function ejecutarQAOnline({
     const erroresRed = [];
 
     // Preparar script con perfil si no viene implícito
+    // Solo se antepone `perfil` si de verdad hay una sesión guardada. Antes se
+    // anteponía siempre, y `ejecutarScript` lanza si no existe storageState —
+    // así que un dominio sin sesión previa hacía morir todo el flujo con
+    // "No hay storageState". Eso contradice de raíz la función que esta skill
+    // anuncia: la auto-curación existe precisamente PARA el caso de no tener
+    // sesión (o tenerla vencida). Sin sesión no se aborta: se navega, se
+    // detecta la redirección al login y se ejecuta el macro.
     const accionesOriginales = [...script];
-    if (dominio && !accionesOriginales.some(a => a.accion === "perfil")) {
-      accionesOriginales.unshift({ accion: "perfil", dominio });
+    if (dominio && !accionesOriginales.some((a) => a.accion === "perfil")) {
+      const hayPerfil = (() => { try { return Boolean(cargarAuth(dominio, dirBase)); } catch { return false; } })();
+      if (hayPerfil) {
+        accionesOriginales.unshift({ accion: "perfil", dominio });
+      } else {
+        evidencia.push({
+          paso: 0, accion: "perfil", omitido: true,
+          nota: `Sin sesión guardada para ${dominio}: se continúa sin perfil. ` +
+                `Si el sitio redirige al login y hay macroLogin, la auto-curación se encarga.`,
+        });
+      }
     }
 
     let paso = 0;

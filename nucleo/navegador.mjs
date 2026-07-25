@@ -71,6 +71,26 @@ function formatearSnapshot(snapshotTexto) {
   }).join("\n");
 }
 
+// Toma el snapshot de accesibilidad, repuebla el mapa de refs y devuelve el
+// texto con marcadores [eN] para que el agente pueda apuntar a un elemento.
+//
+// Esta función NO EXISTÍA: `ejecutarComandoInseguroBase` la llamaba y lanzaba
+// `snapshotPagina is not defined`. Como el snapshot es cómo el agente ve la
+// página, toda la capacidad de navegador (/qa, /scrape, /autenticar,
+// /design-review) estaba muerta. Nadie lo notó porque la eval saltaba ese
+// camino cuando Playwright no estaba instalado — y no lo estaba. Encontrado
+// el 2026-07-25 al instalar Chromium por primera vez.
+//
+// El mapa `refs` se muta EN SITIO a propósito: los pasos siguientes del script
+// (click, escribir, texto) reciben la misma referencia al objeto, así que
+// reasignarlo dejaría a esos pasos mirando un mapa vacío.
+async function snapshotPagina(page, refs) {
+  const texto = await page.locator("body").ariaSnapshot();
+  for (const clave of Object.keys(refs)) delete refs[clave];
+  Object.assign(refs, parsearRefs(texto));
+  return formatearSnapshot(texto);
+}
+
 async function localizador(page, refs, ref) {
   const info = refs[ref];
   if (!info) throw new Error(`ref desconocido: ${ref} (¿corriste "snapshot" primero en este mismo script?)`);
@@ -97,7 +117,14 @@ async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase)
           }
         }
       }
-      res = { accion: "perfil", ok: true, dominio: accion.dominio };
+      // Reportar CUÁNTO se inyectó, no solo que la acción no lanzó. Antes
+      // devolvía `ok: true` a secas: un perfil vacío era indistinguible de uno
+      // cargado, y quien dependiera de la sesión autenticada se enteraba más
+      // tarde, con un fallo confuso. La eval ya consumía `.cookies` y el
+      // módulo nunca lo publicaba, así que la aserción comparaba undefined.
+      const nCookies = state?.cookies?.length ?? 0;
+      const nOrigins = state?.origins?.length ?? 0;
+      res = { accion: "perfil", ok: true, dominio: accion.dominio, cookies: nCookies, origins: nOrigins };
       break;
     }
     case "exportarPerfil": {
@@ -113,25 +140,37 @@ async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase)
     case "snapshot": {
       const dom = await snapshotPagina(page, refs);
       const iny = detectarInyeccion(dom);
-      res = { accion: "snapshot", ok: true, dom, refsCount: Object.keys(refs).length, inyeccion: iny };
+      // Tercera instancia del mismo patrón sistémico en este módulo: la eval
+      // consumía `.refs` y `.texto`, y el módulo publicaba `refsCount` y `dom`.
+      // Las aserciones comparaban contra `undefined` y nadie se enteró porque
+      // este camino nunca se ejecutó sin Playwright instalado. Se publican los
+      // dos nombres: `texto` es el más honesto (es un árbol de accesibilidad,
+      // no el DOM), `dom` se mantiene por compatibilidad.
+      const cuenta = Object.keys(refs).length;
+      res = { accion: "snapshot", ok: true, texto: dom, dom, refs: cuenta, refsCount: cuenta, inyeccion: iny };
       break;
     }
+    // click y escribir usaban `refs[accion.ref]` como si fuera un locator de
+    // Playwright, pero `parsearRefs` guarda objetos planos {role, name,
+    // indice}: `.click()` y `.fill()` no existen ahí. `localizador()` ya hacía
+    // la conversión correcta y solo la usaba `texto` — el módulo quedó a medio
+    // refactorizar y nunca se ejecutó con un navegador real hasta hoy.
     case "click": {
-      const target = refs[accion.ref];
-      if (!target) {
-        res = { accion: "click", ok: false, error: `ref no encontrado: ${accion.ref}` };
+      if (!refs[accion.ref]) {
+        res = { accion: "click", ok: false, error: `ref desconocido: ${accion.ref} (¿corriste "snapshot" primero en este mismo script?)` };
         break;
       }
+      const target = await localizador(page, refs, accion.ref);
       await target.click({ timeout: 5000 });
       res = { accion: "click", ok: true, ref: accion.ref };
       break;
     }
     case "escribir": {
-      const target = refs[accion.ref];
-      if (!target) {
-        res = { accion: "escribir", ok: false, error: `ref no encontrado: ${accion.ref}` };
+      if (!refs[accion.ref]) {
+        res = { accion: "escribir", ok: false, error: `ref desconocido: ${accion.ref} (¿corriste "snapshot" primero en este mismo script?)` };
         break;
       }
+      const target = await localizador(page, refs, accion.ref);
       await target.fill(accion.texto || "", { timeout: 5000 });
       res = { accion: "escribir", ok: true, ref: accion.ref };
       break;
@@ -173,17 +212,24 @@ const ejecutarComandoInseguro = async (accion, page, browser, refs, dirBase) => 
 
 export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
   const { chromium } = await cargarPlaywright();
-  const browser = await chromium.launch({ headless });
+
+  // La validación del perfil va ANTES de lanzar Chromium. Antes se lanzaba
+  // primero y el `throw` salía sin cerrarlo: el proceso del navegador quedaba
+  // huérfano manteniendo vivo el event loop, y el comando se colgaba para
+  // siempre en vez de fallar. Un script con `perfil` sobre un dominio sin
+  // sesión guardada colgaba la sesión entera (encontrado el 2026-07-25, al
+  // ejecutar por primera vez con Chromium instalado).
   let ctxOpts = {};
   const perfilAccion = acciones.find((a) => a.accion === "perfil");
   if (perfilAccion) {
     const state = cargarAuth(perfilAccion.dominio, dirBase);
-    if (state) {
-      ctxOpts = { storageState: state };
-    } else {
+    if (!state) {
       throw new Error(`No hay storageState para ${perfilAccion.dominio} — ejecuta: node <RAIZ>/nucleo/cookies.mjs guardar ${perfilAccion.dominio}`);
     }
+    ctxOpts = { storageState: state };
   }
+
+  const browser = await chromium.launch({ headless });
   const page = await browser.newPage(ctxOpts);
   page.setDefaultTimeout(timeoutMs);
   let refs = {};

@@ -144,4 +144,24 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }
 }
 
-export { guardar, cargar, listar, retirar, dirAuth, normalizarDominio };
+/**
+ * Persiste un storageState YA obtenido, sin interacción humana.
+ *
+ * `guardar()` es interactiva a propósito: abre Chromium VISIBLE para que la
+ * persona se autentique a mano. Eso sirve para la primera vez, pero es lo
+ * contrario de lo que necesita un flujo automatizado que ya exportó la sesión
+ * y solo quiere escribirla en disco.
+ *
+ * `qaonline.mjs` llamaba a `guardar(dominio, state, dirBase)` en su paso de
+ * auto-curación — con el state en la posición de `dirBase`. Además de reventar
+ * con ERR_INVALID_ARG_TYPE, de haber funcionado habría abierto una ventana de
+ * navegador a mitad de un QA desatendido (encontrado el 2026-07-25).
+ */
+function guardarEstado(dominio, state, dirBase) {
+  if (!state || typeof state !== "object") throw new Error("guardarEstado requiere un storageState ya exportado");
+  const archivo = archivoAuth(dominio, dirBase);
+  writeFileSync(archivo, JSON.stringify(state, null, 2), "utf8");
+  return archivo;
+}
+
+export { guardar, guardarEstado, cargar, listar, retirar, dirAuth, normalizarDominio };
