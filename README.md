@@ -64,10 +64,31 @@ IDE: `--host generico --workspace <ruta>` (skills + bloque en AGENTS.md).
 - **Desinstalar:** `instalar.ps1 -Quitar` / `./instalar.sh --quitar` — limpia
   todo lo que instaló (lo registra en `~/.repofibe/instalado.json`).
 
-En Claude Code el camino preferido es el plugin nativo (incluye los hooks
-deterministas): `claude plugin marketplace add <ruta-al-clon>` y
-`claude plugin install repofibe@repofibe-marketplace` — el instalador lo
-intenta automáticamente.
+### Los hooks deterministas (verifica que estén activos)
+
+Los guardias de clase 1 —confirmación ante comandos destructivos, congelamiento
+de directorio, contexto al abrir sesión— viven en hooks, y los hooks **no se
+cargan con solo copiar las skills**.
+
+```bash
+node nucleo/instalar.mjs --hooks   # actívalos y reinicia Claude Code
+```
+
+Es idempotente y seguro: registra los hooks en `~/.claude/settings.json`
+respetando tu configuración y la de otros plugins, respalda tu archivo original
+en `settings.json.bak-repofibe` y no toca nada si el JSON está corrupto.
+
+El camino alternativo es el plugin nativo, que trae los hooks incluidos:
+`claude plugin marketplace add <ruta-al-clon>` y
+`claude plugin install repofibe@repofibe-marketplace`. El instalador lo intenta
+solo, pero si la CLI de `claude` está ocupada cae a modo copia — y en modo copia
+los hooks hay que activarlos con el comando de arriba.
+
+> **Esto no es teórico.** En la instalación del propio autor, las 33 skills
+> estaban puestas y los hooks llevaban versiones sin correr: el guardia
+> determinista, la ventaja central del proyecto, estaba apagado en silencio
+> porque el fallback a modo copia nunca se reintentaba. Corregido en v0.6.0,
+> con eval que lo fija (`evals/seguridad/hooks-activados.mjs`).
 
 ## El ciclo del sprint
 

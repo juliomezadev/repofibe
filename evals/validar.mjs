@@ -258,6 +258,7 @@ await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");
+await ejecutarPrueba("evals/seguridad/hooks-activados.mjs", "Hooks Deterministas Activables");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts-secundarios.mjs", "Seguridad Hosts Secundarios");
 await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");

@@ -35,6 +35,33 @@ Todas las novedades de repofibe, versión por versión.
   mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
   que las evals encontraron antes de publicar.
 
+### Corregido — los guardias deterministas estaban APAGADOS en instalaciones reales
+- **El hallazgo:** en una instalación real, las 33 skills estaban puestas pero
+  `guardia.mjs` y `sesion.mjs` **nunca habían corrido**. El guardia
+  determinista —la pieza que ARQUITECTURA.md presenta como la ventaja central
+  del proyecto, la "clase 1"— llevaba versiones apagado, en silencio.
+- **La causa raíz:** el instalador intenta primero el plugin nativo (única vía
+  que carga `hooks.json`) y, si la CLI de `claude` no está disponible, cae a
+  "modo copia", que instala skills pero no hooks. Y la rama de refresco
+  detectaba la instalación previa en copia, copiaba skills y **volvía sin
+  reintentar los hooks ni reimprimir el aviso**. El fallback era pegajoso y
+  mudo: una vez en copia, jamás se salía.
+- **El arreglo:** `node nucleo/instalar.mjs --hooks` registra los hooks en
+  `~/.claude/settings.json`, que Claude Code lee sin depender del sistema de
+  plugins. Y ahora el refresco los reactiva siempre, en vez de volver callado.
+- Merge cuidadoso sobre configuración del usuario: idempotente (identidad por
+  nombre de hook, no por comando exacto), preserva permisos, modelo y hooks de
+  otros plugins, respalda **el original una sola vez** (`.bak-repofibe`),
+  escritura atómica, y **no toca** un `settings.json` que no pueda parsear.
+- **Dos bugs propios encontrados por la eval antes de shipear:** la primera
+  versión duplicaba las entradas en cada ejecución (la marca de identidad
+  incluía una comilla que `JSON.stringify` escapa como `\"`, así que nunca
+  coincidía), y el respaldo se sobrescribía con la versión ya modificada,
+  perdiendo el original del usuario.
+- **Eval nueva** `evals/seguridad/hooks-activados.mjs`: activación, matcher con
+  `Skill`, idempotencia, preservación de la config del usuario, integridad del
+  respaldo, y que un `settings.json` corrupto quede intacto.
+
 ### Añadido — telemetría local: la fábrica por fin se mide a sí misma
 - **`nucleo/traza.mjs` cableado a los hooks.** Estaba escrito desde v0.4.0 y
   no lo usaba nadie, así que no existía un solo dato real de qué skills se
