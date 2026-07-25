@@ -285,6 +285,7 @@ await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
 await ejecutarPrueba("evals/legal/auditor.mjs", "Legal (auditor de procedencia)");
+await ejecutarPrueba("evals/nucleo/fuentes.mjs", "Fuentes oficiales");
 await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instalación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");
 await ejecutarPrueba("evals/seguridad/hooks-activados.mjs", "Hooks Deterministas Activables");

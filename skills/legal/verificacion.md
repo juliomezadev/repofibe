@@ -66,6 +66,28 @@ no está obligada a saberlo todo; está obligada a no fingir que lo sabe.
 Ignora bloques de código, citas (`>`) y filas de tabla: ahí el texto es
 ilustrativo, no una afirmación.
 
+## Consultar la fuente oficial (en vez de recordarla)
+
+`nucleo/fuentes.mjs` trae el texto de una fuente oficial y —lo importante—
+comprueba si una cifra **aparece literalmente** en ella:
+
+```text
+node <RAIZ>/nucleo/fuentes.mjs consultar <url oficial>
+node <RAIZ>/nucleo/fuentes.mjs verificar <valor> <url oficial>
+```
+
+La diferencia con preguntarle a un modelo: `verificar` no pregunta *"¿cuál es
+el salario mínimo?"* (interpretación, alucinable) sino *"¿el valor 1300000
+está en esta página?"* (comparación de strings, verificable). Si no está,
+responde `NO VERIFICADO` y devuelve el fragmento vacío — **nunca inventa una
+cifra para complacer**. Si está, devuelve el párrafo exacto donde aparece,
+para que puedas leerlo tú.
+
+Solo consulta hosts del allowlist, solo HTTPS, respeta `robots.txt`, se
+identifica con su propio User-Agent y no toca nada tras un login. El contenido
+descargado se envuelve con `no-confiable.mjs` antes de entrar al contexto: es
+texto que repofibe no escribió.
+
 ## El registro de cifras verificadas
 
 Cuando verifiques un dato en fuente oficial, regístralo para no volver a
