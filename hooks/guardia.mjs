@@ -50,7 +50,24 @@ function responder(decision, razon) {
 
 // Patrones destructivos: [regex, descripción]. Cobertura Bash + PowerShell + cmd + SQL.
 const DESTRUCTIVOS = [
-  [/\brm\s+(-[a-z]*\s+)*-[a-z]*[rf][a-z]*[rf][a-z]*\b/i, "rm recursivo/forzado"],
+  // El patrón original exigía que `r` y `f` estuvieran en el MISMO token, así
+  // que `rm -r -f x` y `rm --recursive --force x` pasaban sin aviso — dos de
+  // las formas más comunes de escribirlo (encontrado auditando, 2026-07-25).
+  // Ahora se piden por separado con lookaheads acotados a `[^\n;|&]*`, que
+  // impide cruzar a otro comando encadenado.
+  [/\brm\b(?=[^\n;|&]*\s-{1,2}(?:[a-z]*r[a-z]*|recursive)\b)(?=[^\n;|&]*\s-{1,2}(?:[a-z]*f[a-z]*|force)\b)/i,
+    "rm recursivo y forzado (en cualquier orden, flags cortos o largos)"],
+  [/\bfind\b[^\n;|&]*\s-delete\b/i, "find -delete (borrado masivo sin confirmación)"],
+  [/\bfind\b[^\n;|&]*-exec\s+rm\b/i, "find -exec rm (borrado masivo)"],
+  [/\bshred\b/i, "shred (borrado irrecuperable)"],
+  [/\btruncate\b[^\n;|&]*(-s|--size)\s*0\b/i, "truncate a cero (vacía el archivo)"],
+  [/\bchmod\b[^\n;|&]*-R[^\n;|&]*\s0{3,4}\b/i, "chmod -R 000 (deja el árbol inaccesible)"],
+  // Descartan TODO el trabajo no commiteado, igual que `git reset --hard`.
+  // Solo se alerta sobre el árbol completo (`.` o sin ruta): restaurar un
+  // archivo concreto es una operación cotidiana y alertarla sería ruido.
+  [/\bgit\s+checkout\s+(--\s+)?\.(\s|$)/i, "git checkout -- . (descarta TODOS los cambios locales)"],
+  [/\bgit\s+restore\s+(--\s+)?\.(\s|$)/i, "git restore . (descarta TODOS los cambios locales)"],
+  [/\bgit\s+stash\s+(clear|drop)\b/i, "git stash clear/drop (borra trabajo guardado)"],
   [/\b(ri|del|erase|Remove-Item)\b[^|;]*(-Recurse|-Force)\b/i, "Borrado recursivo/forzado en PowerShell"],
   [/\bRemove-Item\b[^|;]*-Recurse\b[^|;]*-Force\b/i, "Remove-Item -Recurse -Force"],
   [/\bRemove-Item\b[^|;]*-Force\b[^|;]*-Recurse\b/i, "Remove-Item -Force -Recurse"],
@@ -84,8 +101,36 @@ try {
   // ── Protección 2: congelamiento de directorio ─────────────────────────────
   if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tool)) {
     const objetivo = resolve(input.file_path ?? input.notebook_path ?? "");
+
+    // Configuración del propio guardia. Antes esto era un `deny` absoluto, y
+    // eso dejaba MUERTA a la skill /guardian: sus cuatro comandos ("guardián
+    // on/off", "congela a <dir>", "descongela") consisten precisamente en
+    // escribir estos archivos. El bug estuvo invisible mientras los hooks no
+    // corrían; al activarlos quedó a la vista.
+    //
+    // El criterio correcto no es "el agente nunca toca esto", es **asimetría
+    // por dirección**: encender el guardia o congelar deja al usuario MÁS
+    // protegido y no necesita fricción; apagarlo o descongelar lo deja menos
+    // protegido y exige su aprobación explícita. `ask` se la pide — que es lo
+    // que el `deny` pretendía lograr, pero sin romper la skill. Un `deny` que
+    // obliga al usuario a editar JSON a mano termina en usuarios que no
+    // configuran nada, o que apagan la protección por otra vía.
     if (objetivo.endsWith("guardia.json") || objetivo.endsWith("congelar.json")) {
-      responder("deny", "El agente no puede modificar su propia configuración de guardia directamente. El usuario debe hacerlo.");
+      const contenido = String(input.content ?? input.new_string ?? "");
+      const apagaGuardia = /"activo"\s*:\s*false/i.test(contenido);
+      const descongela = objetivo.endsWith("congelar.json") && !/"directorio"\s*:\s*"[^"]+"/i.test(contenido);
+      // Sin contenido visible (p.ej. un Edit parcial) no se puede saber la
+      // dirección del cambio: ante la duda, se pregunta.
+      const direccionDesconocida = contenido.trim() === "";
+
+      if (apagaGuardia || descongela || direccionDesconocida) {
+        responder("ask",
+          `GUARDIA repofibe: se va a REDUCIR tu protección (${objetivo.endsWith("guardia.json") ? "apagar el guardia de comandos destructivos" : "levantar el congelamiento de directorio"}). ` +
+          `Confírmalo tú: el agente no puede reducirla por su cuenta.`);
+      }
+      // Encender el guardia o congelar un directorio: dirección segura, pasa
+      // sin fricción y queda registrado en la traza igual que todo lo demás.
+      salir("permitir");
     }
 
     const congelar = leerJson(join(cwd, ".fabrica", "congelar.json"));

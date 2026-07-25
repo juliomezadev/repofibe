@@ -35,6 +35,35 @@ Todas las novedades de repofibe, versión por versión.
   mantiene intacto: guardias deterministas, estado, memoria, y los bugs reales
   que las evals encontraron antes de publicar.
 
+### Corregido — el guardia se evadía con las formas más comunes, y `/guardian` estaba muerta
+Hallazgos de la auditoría por evasión (2026-07-25) sobre el hook que el repo
+presenta como su ventaja central. Ambos estuvieron **invisibles mientras los
+hooks no corrían en ninguna instalación real**; activarlos los destapó.
+
+- **CRÍTICO — el guardia dejaba pasar `rm -r -f` y `rm --recursive --force`.**
+  El regex exigía que `r` y `f` estuvieran en el MISMO token, así que dos de
+  las formas más comunes de escribir el comando pasaban sin pedir
+  confirmación. El usuario creía tener una protección que no tenía.
+- **Otros destructivos que no se detectaban:** `git checkout -- .` y
+  `git restore .` (descartan TODO el trabajo sin commitear, la misma clase que
+  `git reset --hard`), `git stash clear/drop`, `find -delete`, `find -exec rm`,
+  `shred`, `truncate -s 0`, `chmod -R 000`.
+- **`/guardian` estaba MUERTA.** Sus cuatro comandos ("guardián on/off",
+  "congela a `<dir>`", "descongela") consisten en escribir
+  `.fabrica/guardia.json` o `congelar.json`, y el hook denegaba esa escritura
+  en bloque. La skill no podía hacer absolutamente nada de lo que prometía.
+- **El arreglo no es quitar el candado, es hacerlo asimétrico por dirección.**
+  Encender el guardia o congelar un directorio deja al usuario MÁS protegido:
+  pasa sin fricción. Apagarlo, descongelar, o un cambio cuya dirección no se
+  puede determinar: `ask`, que le pide su aprobación explícita — que era lo
+  que el `deny` pretendía lograr, sin romper la skill. Un `deny` que obliga a
+  editar JSON a mano termina en usuarios que no configuran nada.
+- **`evals/seguridad/guardia.mjs` (nuevo).** Prueba los dos criterios con el
+  mismo peso: que **detenga** (18 destructivos, incluidas todas las evasiones
+  encontradas) y que **no estorbe** (16 comandos cotidianos, incluido
+  `--force-with-lease`, deben pasar sin alerta). Un guardia ruidoso se apaga a
+  la semana, y un guardia apagado protege cero.
+
 ### Añadido — `/legal` deja de ser prompt puro: auditor determinista de procedencia
 - **El problema.** `/legal` era **100% clase 3**: todas sus garantías vivían en
   el texto de `SKILL.md` ("nunca inventes cifras", "verifica antes de afirmar").
