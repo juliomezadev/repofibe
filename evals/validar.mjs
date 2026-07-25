@@ -260,6 +260,15 @@ rmSync(tmp, { recursive: true, force: true });
 const LIMITE_MS = 90_000;
 const parciales = [];
 
+// Huella de la telemetría REAL antes de correr nada. Una suite de pruebas no
+// puede escribir en el `.fabrica/traza.jsonl` del proyecto: los spans de un
+// mock que falla a propósito quedan indistinguibles de un fallo real y
+// envenenan la observabilidad. Pasó de verdad (2026-07-25): `qaonline: Test
+// Dashboard Mock` con estado de fallo se acumuló en la traza del usuario y al
+// auditar se tomó por una pista genuina.
+const RUTA_TRAZA_REAL = join(RAIZ, ".fabrica", "traza.jsonl");
+const trazaAntes = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+
 async function ejecutarPrueba(rutaRel, nombre) {
   const ruta = join(RAIZ, rutaRel);
   if (!existsSync(ruta)) {
@@ -318,6 +327,18 @@ if (fallos.length) {
   for (const f of fallos) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
+// ── La suite no puede haber tocado la telemetría real del proyecto ─────────
+{
+  const trazaDespues = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+  if (trazaDespues !== trazaAntes) {
+    fallo(
+      `la suite escribió en la telemetría REAL (.fabrica/traza.jsonl creció ${trazaDespues - trazaAntes} bytes). ` +
+      `Los spans de prueba son indistinguibles de los reales y envenenan la observabilidad. ` +
+      `La eval culpable debe fijar REPOFIBE_TRAZA_DIR a un directorio temporal.`
+    );
+  } else ok("la suite no contamina la telemetría real del proyecto");
+}
+
 if (parciales.length) {
   console.log(`\nVerificación PARCIAL en ${parciales.length} suite(s) — no cuentan como verificadas de punta a punta:`);
   for (const p of parciales) console.log(`  · ${p}`);
