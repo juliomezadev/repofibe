@@ -40,7 +40,7 @@ import { pathToFileURL } from "node:url";
 import { FUENTES_OFICIALES } from "./legal.mjs";
 import { envolver, detectarInyeccion } from "./no-confiable.mjs";
 
-const AGENTE = "repofibe/0.6 (consulta de fuentes legales oficiales; +https://github.com/juliomezasena-byte/repofibe)";
+const AGENTE = "repofibe/0.6 (consulta de fuentes legales oficiales; +https://github.com/juliomezadev/repofibe)";
 const TIMEOUT_MS = 15000;
 const TOPE_BYTES = 3_000_000; // una norma larga cabe de sobra; un binario no
 

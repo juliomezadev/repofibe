@@ -3,7 +3,7 @@
 **Tu equipo de ingeniería virtual, en español.** Un CEO que reta el alcance,
 un eng manager que firma la arquitectura, una diseñadora que caza el AI slop,
 un staff engineer que encuentra los bugs que CI no ve, un QA con ojos, un CSO
-sin ruido y un release engineer que shipea el PR. 32 especialistas que
+sin ruido y un release engineer que shipea el PR. 33 especialistas que
 trabajan como trabaja un buen equipo: con proceso, con estado y con memoria.
 
 Inspirado en [gstack](https://github.com/garrytan/gstack) de Garry Tan —
@@ -41,13 +41,13 @@ dependencias npm, cero binarios compilados en el núcleo.
 
 ```powershell
 # Windows
-git clone https://github.com/juliomezasena-byte/repofibe.git
+git clone https://github.com/juliomezadev/repofibe.git
 cd repofibe; .\instalar.ps1
 ```
 
 ```bash
 # macOS / Linux / WSL
-git clone https://github.com/juliomezasena-byte/repofibe.git
+git clone https://github.com/juliomezadev/repofibe.git
 cd repofibe && ./instalar.sh
 ```
 
@@ -106,7 +106,6 @@ lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
 | `/grafo` | **Grafo de código** | ¿Qué se rompe si toco X? (impacto transitivo), hubs críticos, deps — consultas de 20 líneas sin leer archivos. Consume grafos externos (graphify/NetworkX) con chequeo de frescura obligatorio |
 | `/oficina` | **Socio de YC** | Seis preguntas forzadas que reencuadran el producto antes de escribir código. Produce el doc de diseño |
 | `/spec` | **Autor de specs** | Intención vaga → spec ejecutable en 5 fases, con gate de calidad 7/10 y redacción de secretos |
-| `/qa` | **QA con ojos** | Control de calidad ejecutable. |
 | `/qaonline` | **QA en vivo** | QA en vivo en producción/staging con Self-Healing Auth y evidencia determinista en Markdown. |
 | `/plan-ceo` | **CEO fundador** | Reta premisas, busca el producto de 10 estrellas. Modos: expansión / selectiva / mantener / reducción |
 | `/plan-ing` | **Eng manager** | Flujo de datos ASCII, estados, casos borde, matriz de pruebas, modos de fallo. Veredicto: FIRMADO o DEVUELTO |
@@ -180,7 +179,7 @@ node evals/validar.mjs   # tier 1: gratis, <5s, corre en cada push
 node evals/tier2.mjs     # tier 2: E2E, sesión de sprint completa simulada
 ```
 
-Tier 1 valida frontmatter y convenciones de las 32 skills, manifiestos,
+Tier 1 valida frontmatter y convenciones de las 33 skills, manifiestos,
 hooks — y ejecuta de verdad `estado`, `memoria`, `guardia`, `grafo`,
 `secretos`, `salud` y `navegador` contra directorios temporales (incluidos
 los casos "rm -rf → ask", "--force-with-lease → silencio", "edición fuera
@@ -191,10 +190,11 @@ fluye correctamente entre `estado.mjs`, `checkpoint.mjs`, `grafo.mjs` y
 `pruebas.mjs` — el tipo de bug de integración que tests aislados no
 atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
 
-## Hoja de ruta
+## Prioridades de desarrollo actuales
 
-- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory).
-- **v0.5** — `/pair-agent`, embeddings/búsqueda semántica.
+- Conectar componentes construidos pero todavía huérfanos.
+- Mejorar la integración multi-host.
+- Mantener evals deterministas.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 
