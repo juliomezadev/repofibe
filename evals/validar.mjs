@@ -333,6 +333,7 @@ await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/qaonline-persistencia.mjs", "QA en Vivo (sesión persistente)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
 await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
+await ejecutarPrueba("evals/nucleo/sync-auth.mjs", "Sync (auth local)");
 await ejecutarPrueba("evals/seguridad/veredicto.mjs", "Veredicto de evals");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
