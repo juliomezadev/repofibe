@@ -2,7 +2,9 @@ name: evals
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - release/repofibe-stable-candidate
   pull_request:
 
 jobs:
@@ -17,6 +19,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Runtime versions
+        run: |
+          node --version
+          npm --version
       - name: Dependencias Node
         run: npm ci
       - name: Chromium para QA/browser
@@ -35,5 +41,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Runtime versions
+        run: |
+          node --version
+          npm --version
       - name: Evals tier 2 (E2E, sesión de sprint completa simulada)
         run: node evals/tier2.mjs
