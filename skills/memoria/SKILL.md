@@ -44,3 +44,16 @@ tener memoria.
 Una memoria = un hecho + por qué importa + cómo aplicarlo. "El build falla a
 veces" no es memoria; "el build falla si Node <20 por el flag X — verificar
 con node --version antes de investigar otra cosa" sí.
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada `memoria`:
+`agregar`, `olvidar` y `exportar` son `MUST_REGISTER`; `podar` es
+`MAY_REGISTER`; `buscar` y `listar` son `MUST_NOT_REGISTER` porque sólo
+consultan y no deben mutar el sprint.
+
+Para una acción `MUST_REGISTER`, registra una sola vez el resultado:
+
+```
+node <RAIZ>/nucleo/estado.mjs registrar memoria "<resultado en una línea>"
+```

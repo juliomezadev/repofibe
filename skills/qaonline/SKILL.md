@@ -38,3 +38,14 @@ node <RAIZ>/nucleo/qaonline.mjs --flujo "<Nombre del Flujo>" --dominio "<dominio
 ```bash
 node <RAIZ>/nucleo/traza.mjs inspeccionar <traceId>
 ```
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada `qaonline`:
+`ejecutar` es `MUST_REGISTER` y `configurar-sesión` es `MAY_REGISTER`.
+
+Después de ejecutar un flujo, registra una sola vez el resultado:
+
+```
+node <RAIZ>/nucleo/estado.mjs registrar qaonline "<resultado en una línea>"
+```

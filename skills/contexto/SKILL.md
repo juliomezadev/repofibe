@@ -59,3 +59,15 @@ utilizable. `/shipear` lo ejecuta en su paso 6 si detecta WIPs en la rama.
 Un checkpoint no reemplaza los commits atómicos de `/construir`: los pasos
 completados se commitean normal; el checkpoint captura lo INCOMPLETO entre
 pasos. Por eso el título dice WIP y por eso se aplana antes del PR.
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada
+`contexto`: `guardar` y `aplanar` son `MUST_REGISTER`; `restaurar` es
+`MUST_NOT_REGISTER` porque sólo consulta el estado.
+
+Para `guardar` o `aplanar`, registra una sola vez el resultado de la acción:
+
+```
+node <RAIZ>/nucleo/estado.mjs registrar contexto "<resultado en una línea>"
+```

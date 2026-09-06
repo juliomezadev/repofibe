@@ -67,3 +67,9 @@ continuo ya guardó el cambio, el árbol de trabajo vuelve a estar limpio y
 sueltos como `.fabrica/sprint.json`). Con checkpoint continuo activo, usa
 siempre un rango explícito contra el commit BASE del sprint:
 `node <RAIZ>/nucleo/pruebas.mjs afectadas <commit-base-del-sprint>`.
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada
+`pruebas-afectadas`. `afectadas` es `MUST_NOT_REGISTER`: esta skill sólo
+consulta el impacto del diff y no debe mutar el estado del sprint.
