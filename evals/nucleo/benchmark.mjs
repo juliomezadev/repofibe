@@ -36,6 +36,8 @@ async function probarMedirVitalesSiHayPlaywright() {
   }
 
   const servidor = createServer((req, res) => {
+    if (req.url === "/error-500") { res.writeHead(500); res.end("error interno"); return; }
+    if (req.url === "/error-404") { res.writeHead(404); res.end("no encontrado"); return; }
     if (req.url === "/estilo.css") {
       res.writeHead(200, { "content-type": "text/css" });
       res.end("h1 { color: blue; }");
@@ -67,6 +69,13 @@ async function probarMedirVitalesSiHayPlaywright() {
     const rFallo = await medirVitales("http://127.0.0.1:1/", { timeoutMs: 2000 });
     assert.equal(rFallo.ok, false, "un puerto que no escucha debía fallar con evidencia, no explotar");
     assert.ok(rFallo.error);
+
+    const r500 = await medirVitales(`${url}error-500`, { esperaMs: 0 });
+    assert.equal(r500.ok, false, "una página HTTP 500 no debe convertirse en baseline válido");
+    assert.match(r500.error, /HTTP 500/);
+    const r404 = await medirVitales(`${url}error-404`, { esperaMs: 0 });
+    assert.equal(r404.ok, false, "una página HTTP 404 no debe convertirse en baseline válido");
+    assert.match(r404.error, /HTTP 404/);
 
     console.log(`ok: medirVitales end-to-end con Chromium real (LCP ${Math.round(r.lcpMs)}ms, CLS ${r.cls.toFixed(3)}, ${r.recursos} recursos) y fallo controlado ante URL inalcanzable`);
   } finally {

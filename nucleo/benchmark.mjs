@@ -61,7 +61,10 @@ export async function medirVitales(url, { headless = true, esperaMs = 1500, time
     page.setDefaultTimeout(timeoutMs);
     await page.addInitScript(SCRIPT_OBSERVADOR);
     const inicio = Date.now();
-    await page.goto(url, { waitUntil: "load" });
+    const respuesta = await page.goto(url, { waitUntil: "load" });
+    if (!respuesta?.ok()) {
+      throw new Error(`HTTP ${respuesta?.status() ?? "desconocido"} al navegar a ${url}`);
+    }
     await page.waitForTimeout(esperaMs); // deja que LCP/CLS se asienten
     const tiempoTotalMs = Date.now() - inicio;
 
