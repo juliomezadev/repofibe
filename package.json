@@ -2,7 +2,7 @@
   "name": "repofibe",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11.0"
   },
   "scripts": {
     "setup:chromium": "playwright install chromium"

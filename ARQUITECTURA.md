@@ -42,7 +42,7 @@ registra cada ruta escrita, así la desinstalación es exacta, no heurística.
 ### Node con runtime mínimo y dependencias de QA reproducibles
 
 gstack necesita Bun + build de un binario de ~58MB, y en Windows tiene que
-caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa Node 20+
+caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa Node 20.11+
 y `.mjs`, sin dependencias externas en el runtime. Las pruebas de navegador
 declaran `playwright@1.62.0` como dependencia de desarrollo y preparan
 Chromium con `npm run setup:chromium`. No hay build step ni binario propio

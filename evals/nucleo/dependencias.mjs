@@ -11,7 +11,7 @@ const lock = JSON.parse(readFileSync(join(RAIZ, "package-lock.json"), "utf8"));
 const raizLock = lock.packages?.[""] ?? {};
 
 assert.equal(pkg.name, "repofibe");
-assert.equal(pkg.engines?.node, ">=20", "Node mínimo debe ser explícito");
+assert.equal(pkg.engines?.node, ">=20.11.0", "Node mínimo debe ser explícito");
 assert.equal(pkg.scripts?.["setup:chromium"], "playwright install chromium", "Chromium debe prepararse con un comando local reproducible");
 assert.deepEqual(pkg.dependencies ?? {}, {}, "Repofibe no tiene dependencias runtime externas");
 assert.deepEqual(pkg.devDependencies, { playwright: "1.62.0" }, "Playwright debe ser la única dependencia de desarrollo fijada");
@@ -21,4 +21,4 @@ assert.equal(lock.packages?.["node_modules/playwright-core"]?.version, "1.62.0")
 assert.equal(lock.packages?.["node_modules/playwright"]?.engines?.node, ">=20");
 assert.equal(lock.packages?.["node_modules/playwright-core"]?.engines?.node, ">=20");
 assert.equal(Object.hasOwn(raizLock, "dependencies"), false, "lockfile no debe declarar Playwright como runtime");
-console.log("ok: package.json y package-lock.json declaran sólo Playwright de desarrollo, fijado y compatible con Node 20+");
+console.log("ok: package.json y package-lock.json declaran sólo Playwright de desarrollo, fijado y compatible con Node 20.11+");

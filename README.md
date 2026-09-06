@@ -27,7 +27,7 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-**Requisitos:** [Node.js](https://nodejs.org) 20+ y Git. El núcleo no tiene
+**Requisitos:** [Node.js](https://nodejs.org) 20.11+ y Git. El núcleo no tiene
 dependencias runtime externas. Las pruebas de navegador requieren npm, la
 dependencia de desarrollo Playwright fijada en `package.json` y Chromium.
 

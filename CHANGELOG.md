@@ -6,7 +6,7 @@ Todas las novedades de repofibe, versión por versión.
 ### Corregido — reproducibilidad y documentación de la estabilización inicial
 - `package.json` y `package-lock.json` ahora están versionados. Playwright
   `1.62.0` es dependencia de desarrollo fijada y el mínimo declarado de Node
-  es 20.
+  es 20.11.0.
 - `npm ci` seguido de `npm run setup:chromium` reproduce las pruebas de
   navegador desde un checkout limpio usando sólo Chromium.
 - Tier 1, Tier 2, QA online, navegador, sync, grafo, estado y contrato de
