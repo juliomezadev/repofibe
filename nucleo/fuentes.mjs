@@ -37,6 +37,7 @@
 //   node nucleo/fuentes.mjs verificar <valor> <url>
 
 import { pathToFileURL } from "node:url";
+import { isIP } from "node:net";
 import { FUENTES_OFICIALES } from "./legal.mjs";
 import { envolver, detectarInyeccion } from "./no-confiable.mjs";
 
@@ -52,6 +53,36 @@ export function esHostOficial(url) {
   if (u.protocol !== "https:") return false;
   const host = u.hostname.toLowerCase();
   return FUENTES_OFICIALES.some((f) => host === f || host.endsWith("." + f));
+}
+
+function esIpRestringida(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (["localhost", "localhost.localdomain", "metadata", "metadata.google.internal", "instance-data.ec2.internal"].includes(host)) return true;
+
+  const ipv4 = host.includes(".") ? host.slice(host.lastIndexOf(":") + 1) : host;
+  if (isIP(ipv4) === 4) {
+    const octetos = ipv4.split(".").map(Number);
+    const [a, b] = octetos;
+    return a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 192 && b === 0) ||
+      (a === 198 && (b === 18 || b === 19));
+  }
+  if (isIP(host) === 6) {
+    return host === "::" || host === "::1" || /^f[cd]/i.test(host) || /^fe[89ab]/i.test(host);
+  }
+  return false;
+}
+
+export function esDestinoSeguro(url) {
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (!["http:", "https:"].includes(u.protocol)) return false;
+  if (esIpRestringida(u.hostname)) return false;
+  return esHostOficial(u.href);
 }
 
 // ── robots.txt ──────────────────────────────────────────────────────────────
@@ -93,18 +124,35 @@ export function permitidoPorRobots(robotsTxt, ruta, agente = "repofibe") {
   return decision;
 }
 
-async function pedir(url, { timeoutMs = TIMEOUT_MS } = {}) {
-  const control = new AbortController();
-  const reloj = setTimeout(() => control.abort(), timeoutMs);
-  try {
-    return await fetch(url, {
-      headers: { "user-agent": AGENTE, accept: "text/html,text/plain,*/*" },
-      redirect: "follow",
-      signal: control.signal,
-    });
-  } finally {
-    clearTimeout(reloj);
+const REDIRECCIONES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECCIONES = 5;
+
+export async function pedir(url, { timeoutMs = TIMEOUT_MS, fetchImpl = fetch, permitirDestino = esDestinoSeguro } = {}) {
+  let actual = String(url);
+  for (let salto = 0; salto <= MAX_REDIRECCIONES; salto += 1) {
+    if (!permitirDestino(actual)) throw new ErrorFuente(`destino no permitido: ${actual}`);
+    const control = new AbortController();
+    const reloj = setTimeout(() => control.abort(), timeoutMs);
+    let respuesta;
+    try {
+      respuesta = await fetchImpl(actual, {
+        headers: { "user-agent": AGENTE, accept: "text/html,text/plain,*/*" },
+        redirect: "manual",
+        signal: control.signal,
+      });
+    } finally {
+      clearTimeout(reloj);
+    }
+    if (!REDIRECCIONES.has(respuesta.status)) return respuesta;
+    const location = respuesta.headers.get("location");
+    if (!location) return respuesta;
+    let siguiente;
+    try { siguiente = new URL(location, actual).href; }
+    catch { throw new ErrorFuente(`redirección inválida desde ${actual}`); }
+    if (!permitirDestino(siguiente)) throw new ErrorFuente(`redirección a destino no permitido: ${siguiente}`);
+    actual = siguiente;
   }
+  throw new ErrorFuente(`demasiadas redirecciones (máximo ${MAX_REDIRECCIONES})`);
 }
 
 // ── Extracción de texto sin dependencias ───────────────────────────────────
@@ -141,7 +189,10 @@ export async function consultar(url, opciones = {}) {
     try {
       const r = await pedir(`${u.origin}/robots.txt`, { timeoutMs: 5000 });
       if (r.ok) robots = await r.text();
-    } catch { /* sin robots.txt legible: se procede */ }
+    } catch (error) {
+      if (error instanceof ErrorFuente) throw error;
+      /* sin robots.txt legible: se procede */
+    }
     if (!permitidoPorRobots(robots, u.pathname, AGENTE)) {
       throw new ErrorFuente(`robots.txt de ${u.hostname} no permite ${u.pathname}. No se consulta.`);
     }
