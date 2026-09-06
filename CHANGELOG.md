@@ -2,6 +2,19 @@
 
 Todas las novedades de repofibe, versión por versión.
 
+## [Unreleased] — 2026-09-06
+### Corregido — reproducibilidad y documentación de la estabilización inicial
+- `package.json` y `package-lock.json` ahora están versionados. Playwright
+  `1.62.0` es dependencia de desarrollo fijada y el mínimo declarado de Node
+  es 20.
+- `npm ci` seguido de `npm run setup:chromium` reproduce las pruebas de
+  navegador desde un checkout limpio usando sólo Chromium.
+- Tier 1, Tier 2, QA online, navegador, sync, grafo, estado y contrato de
+  cierre documentan sus estados `PASS`, `SKIPPED`, `OPTIONAL` o `MANUAL` sin
+  convertir omisiones en aprobaciones.
+- Los archivos locales no rastreados del escáner experimental de cadena de
+  suministro fueron auditados y rechazados; no forman parte del producto.
+
 ## [0.6.2] — 2026-07-25
 ### Corregido — la capa de inteligencia estaba construida pero SIN CONECTAR
 - **`docs/PLAN-SUPERACION.md` marcaba ✅ el orquestador.** La capa

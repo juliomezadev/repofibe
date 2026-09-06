@@ -5,7 +5,7 @@
 // archivo de evals/e2e/), así que "node evals/tier2.mjs" ya la ejecuta.
 //
 // Diferencia con lo que ya existe:
-//   - validar.mjs (tier 1)   → estructura/lint, gratis, <5s, sin red.
+//   - validar.mjs (tier 1)   → estructura/lint, gratis y sin red externa.
 //   - sprint-completo.mjs (tier 2) → cadena real de nucleo/*.mjs, sin LLM.
 //   - nucleo/juez.mjs (tier 3) → rúbrica de 5 criterios vía CLI instalado
 //     (claude/gemini), pensado para juicio profundo de un output ya escrito.

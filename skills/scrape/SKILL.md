@@ -16,7 +16,7 @@ este archivo; si ahí no existe `plantillas/`, usa `~/.repofibe/app`. Lee
 # /scrape — Extraer datos reales de una página
 
 Requiere `navegador.mjs` (Playwright); si no está instalado, el propio
-comando lo dice — propón `npm install playwright && npx playwright install chromium`.
+comando lo dice — propón `npm ci && npm run setup:chromium`.
 
 ## Fase 1 — Notas de dominio (arranca más rápido si ya visitaste este sitio)
 

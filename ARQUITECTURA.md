@@ -39,12 +39,14 @@ harness gestiona carga, hooks y actualizaciones); en el resto de hosts son
 copias planas idempotentes — reinstalar ES actualizar. `~/.repofibe/instalado.json`
 registra cada ruta escrita, así la desinstalación es exacta, no heurística.
 
-### Node puro, cero dependencias
+### Node con runtime mínimo y dependencias de QA reproducibles
 
 gstack necesita Bun + build de un binario de ~58MB, y en Windows tiene que
-caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa lo que
-ya está en todas partes: Node 18+ y `.mjs` sin `node_modules`. No hay build
-step, no hay binario desactualizado, no hay "funciona en mi Mac". El costo:
+caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa Node 20+
+y `.mjs`, sin dependencias externas en el runtime. Las pruebas de navegador
+declaran `playwright@1.62.0` como dependencia de desarrollo y preparan
+Chromium con `npm run setup:chromium`. No hay build step ni binario propio
+desactualizado. El costo:
 sin SQLite nativo — por eso la memoria es JSONL (que además es legible,
 versionable y a prueba de corrupción total).
 
@@ -84,8 +86,16 @@ reserva para el congelamiento, que el propio usuario activó.
 `guardia.mjs` de verdad contra un directorio temporal y verifica el protocolo
 completo del hook (JSON por stdin → decisión por stdout), la normalización de
 acentos en la búsqueda, y los falsos positivos conocidos
-(`--force-with-lease` no debe alertar). Tier 1 es gratis y corre en CI; los
-tiers con LLM (E2E, juez) llegan en v0.2/v0.3.
+(`--force-with-lease` no debe alertar). Tier 1 es gratis y corre en CI; Tier 2
+incluye una sesión E2E y la suite LLM se omite sin `ANTHROPIC_API_KEY`.
+
+### Escáner experimental de cadena de suministro
+
+Los archivos locales no rastreados `hooks/antivirus-hook.mjs` y
+`nucleo/antivirus.mjs` fueron auditados en Batch 4 y rechazados: cubren
+indicadores concretos de paquetes y persistencia, pero no ofrecen cobertura
+general de contenido o binarios, tienen falsos positivos y no están cableados.
+No forman parte del producto ni deben describirse como un antivirus.
 
 ## Lo que intencionalmente NO está (todavía o nunca)
 

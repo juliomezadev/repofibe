@@ -100,7 +100,7 @@ async function main() {
       // la declare parcial (encontrado auditando, 2026-07-25).
       console.log("ok: contratos y pipeline de fallback verificados (sin navegador)");
       console.log("omitido: Self-Healing Auth y evidencia en Markdown NO se probaron — requieren Playwright. " +
-        "La función principal de esta skill queda SIN verificar: `npm install playwright && npx playwright install chromium`");
+        "La función principal de esta skill queda SIN verificar: `npm ci && npm run setup:chromium`");
     } else {
       throw err;
     }

@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // navegador.mjs — ojos reales para /qa y /diseno, sin gstack.
 //
-// Playwright NO es dependencia de repofibe (que sigue siendo cero-deps):
-// se importa dinámicamente y, si no está instalado en el proyecto, el
-// error explica cómo instalarlo — el mismo patrón que /grafo usa con
-// graphify (herramienta externa opcional, nunca embebida).
+// Playwright es dependencia de desarrollo para las pruebas de navegador:
+// se importa dinámicamente para que el núcleo siga funcionando sin ella, y
+// el error explica cómo preparar el checkout (`npm ci` + Chromium local).
 //
 // Sistema de refs: propio, sobre el texto público de page.ariaSnapshot()
 // (la API interna que genera refs no está expuesta en el paquete público
@@ -37,8 +36,8 @@ async function cargarPlaywright() {
   } catch {
     throw new Error(
       "Playwright no está instalado en este proyecto. Instálalo con:\n" +
-      "  npm install playwright && npx playwright install chromium\n" +
-      "(repofibe no lo empaqueta — sigue siendo cero-dependencias)."
+      "  npm ci && npm run setup:chromium\n" +
+      "(Playwright es dependencia de desarrollo; el núcleo no la requiere)."
     );
   }
 }

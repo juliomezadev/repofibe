@@ -53,7 +53,7 @@ async function probarPerfilSiHayPlaywright() {
   let pw;
   try { pw = await import("playwright"); }
   catch {
-    console.log("omitido: playwright no está instalado en este proyecto (repofibe es cero-deps) — instala con `npm install playwright && npx playwright install chromium` para correr esta prueba de integración real");
+    console.log("omitido: playwright no está instalado — ejecuta `npm ci && npm run setup:chromium` para correr esta prueba de integración real");
     return false; // el llamador NO debe anunciar que verificó Chromium
   }
 

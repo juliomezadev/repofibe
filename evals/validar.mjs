@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validar.mjs — evals tier 1 de repofibe: gratis, <5s, sin red.
+// validar.mjs — evals tier 1 de repofibe: gratis, sin red externa.
 // Valida estructura (skills, manifiestos, hooks) Y comportamiento real
 // (estado, memoria y guardia se ejecutan de verdad contra un dir temporal).
 // Salida: lista de fallos; exit 1 si hay alguno. Pensado para CI y pre-commit.
@@ -371,7 +371,7 @@ if (fallos.length) {
 if (parciales.length) {
   console.log(`\nVerificación PARCIAL en ${parciales.length} suite(s) — no cuentan como verificadas de punta a punta:`);
   for (const p of parciales) console.log(`  · ${p}`);
-  console.log("  Causa habitual: Playwright no instalado (dependencia opcional).");
-  console.log("  Para cerrarlas: npm install playwright && npx playwright install chromium");
+  console.log("  Causa habitual: Playwright no instalado (dependencia de desarrollo).");
+  console.log("  Para cerrarlas: npm ci && npm run setup:chromium");
 }
 console.log("\nTodo verde. repofibe pasó las evals tier 1.");

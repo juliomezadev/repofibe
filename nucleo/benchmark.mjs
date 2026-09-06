@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // benchmark.mjs — Core Web Vitals reales, sobre Chromium real.
 //
-// Igual que navegador.mjs y salud.mjs: Playwright NO es dependencia de
-// repofibe (se importa dinámicamente; si falta, el error explica cómo
-// instalarlo). No reusa el formato de "script de acciones" de
+// Igual que navegador.mjs y salud.mjs: Playwright es dependencia de desarrollo
+// y se importa dinámicamente; si falta, el error explica cómo preparar el
+// checkout. No reusa el formato de "script de acciones" de
 // navegador.mjs porque medir LCP/CLS exige inyectar un observer ANTES de
 // navegar (addInitScript) — un paso que ese formato no modela — así que
 // vive como módulo propio, con la misma forma de CLI que salud.mjs
@@ -27,8 +27,8 @@ async function cargarPlaywright() {
   } catch {
     throw new Error(
       "Playwright no está instalado en este proyecto. Instálalo con:\n" +
-      "  npm install playwright && npx playwright install chromium\n" +
-      "(repofibe no lo empaqueta — sigue siendo cero-dependencias)."
+      "  npm ci && npm run setup:chromium\n" +
+      "(Playwright es dependencia de desarrollo; el núcleo no la requiere)."
     );
   }
 }

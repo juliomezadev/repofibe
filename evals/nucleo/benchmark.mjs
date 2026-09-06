@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Pruebas funcionales de nucleo/benchmark.mjs. compararVitales() se prueba
-// siempre (función pura, cero deps). medirVitales() con Chromium real SOLO
-// si Playwright está instalado — repofibe sigue siendo cero-deps, igual
+// siempre (función pura, sin dependencias de ejecución). medirVitales() con
+// Chromium real requiere Playwright, que se instala como dependencia de desarrollo
 // que evals/nucleo/navegador.mjs.
 
 import { strict as assert } from "node:assert";
@@ -31,7 +31,7 @@ async function probarMedirVitalesSiHayPlaywright() {
   let disponible = true;
   try { await import("playwright"); } catch { disponible = false; }
   if (!disponible) {
-    console.log("omitido: playwright no está instalado en este proyecto (repofibe es cero-deps) — instala con `npm install playwright && npx playwright install chromium` para correr esta prueba de integración real");
+    console.log("omitido: playwright no está instalado — ejecuta `npm ci && npm run setup:chromium` para correr esta prueba de integración real");
     return;
   }
 
