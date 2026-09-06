@@ -210,7 +210,15 @@ const ejecutarComandoInseguro = async (accion, page, browser, refs, dirBase) => 
   return fn(accion, page, browser, refs, dirBase);
 };
 
-export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
+// Una sesión explícita mantiene el mismo browser, contexto, page y mapa de
+// refs durante una secuencia. No hay singleton global: cada consumidor decide
+// cuándo abrir y cerrar su propia sesión.
+export async function crearSesionNavegador({
+  headless = true,
+  timeoutMs = 15000,
+  dirBase = undefined,
+  accionesIniciales = [],
+} = {}) {
   const { chromium } = await cargarPlaywright();
 
   // La validación del perfil va ANTES de lanzar Chromium. Antes se lanzaba
@@ -220,7 +228,7 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
   // sesión guardada colgaba la sesión entera (encontrado el 2026-07-25, al
   // ejecutar por primera vez con Chromium instalado).
   let ctxOpts = {};
-  const perfilAccion = acciones.find((a) => a.accion === "perfil");
+  const perfilAccion = accionesIniciales.find((a) => a.accion === "perfil");
   if (perfilAccion) {
     const state = cargarAuth(perfilAccion.dominio, dirBase);
     if (!state) {
@@ -230,14 +238,42 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
   }
 
   const browser = await chromium.launch({ headless });
-  const page = await browser.newPage(ctxOpts);
-  page.setDefaultTimeout(timeoutMs);
-  let refs = {};
+  let context;
+  try {
+    context = await browser.newContext(ctxOpts);
+    const page = await context.newPage();
+    page.setDefaultTimeout(timeoutMs);
+    const refs = {};
+    let cerrada = false;
+    return {
+      browser,
+      context,
+      page,
+      refs,
+      get cerrada() { return cerrada; },
+      ejecutar: (accion) => ejecutarComandoInseguro(accion, page, browser, refs, dirBase),
+      cerrar: async () => {
+        if (cerrada) return;
+        cerrada = true;
+        try { await context.close(); } finally { await browser.close(); }
+      },
+    };
+  } catch (e) {
+    try { await browser.close(); } catch {}
+    throw e;
+  }
+}
+
+export async function ejecutarScript(acciones, opciones = {}) {
+  const session = await crearSesionNavegador({
+    ...opciones,
+    accionesIniciales: acciones,
+  });
   const resultados = [];
   try {
     for (const accion of acciones) {
       try {
-        const r = await ejecutarComandoInseguro(accion, page, browser, refs, dirBase);
+        const r = await session.ejecutar(accion);
         resultados.push(r);
         if (!r.ok) break; // one-shot detiene en error
       } catch (e) {
@@ -246,7 +282,7 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
       }
     }
   } finally {
-    await browser.close();
+    await session.cerrar();
   }
   return resultados;
 }
