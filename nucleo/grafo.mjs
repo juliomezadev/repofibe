@@ -16,29 +16,70 @@
 //   node grafo.mjs externo <dir> resumen    # resumen de un graph.json externo (NetworkX)
 //   node grafo.mjs externo <dir> frescura   # manifest.json vs disco
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync, existsSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, renameSync, existsSync, statSync } from "node:fs";
 import { join, dirname, relative, extname } from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { descubrirArchivos } from "./archivos.mjs";
 
 const RAIZ = process.cwd();
 const ARCHIVO = join(RAIZ, ".fabrica", "grafo.json");
-const IGNORAR = new Set(["node_modules", ".git", "dist", "build", "out", ".next", "coverage", ".fabrica", "__pycache__", ".venv", "venv", "target", "vendor", ".cache"]);
 const EXTS = new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"]);
 
 export const norm = (p) => p.split("\\").join("/");
 
-function archivosCodigo(dir, base, salida) {
-  let entradas;
-  try { entradas = readdirSync(dir, { withFileTypes: true }); } catch { return salida; }
-  for (const e of entradas) {
-    if (e.isDirectory()) {
-      if (!IGNORAR.has(e.name) && !e.name.startsWith(".")) archivosCodigo(join(dir, e.name), base, salida);
-    } else if (EXTS.has(extname(e.name).toLowerCase())) {
-      salida.push(norm(relative(base, join(dir, e.name))));
-    }
+function archivosCodigo() {
+  return descubrirArchivos(RAIZ, { extensiones: EXTS })
+    .map((p) => norm(relative(RAIZ, p)));
+}
+
+function gitValor(args) {
+  try {
+    return execFileSync("git", ["-C", RAIZ, ...args], {
+      encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch { return null; }
+}
+
+function fingerprintFuente(archivos) {
+  const hash = createHash("sha256");
+  for (const archivo of archivos) {
+    hash.update(archivo);
+    hash.update("\0");
+    try { hash.update(readFileSync(join(RAIZ, archivo), "utf8")); }
+    catch { hash.update("<archivo-no-legible>"); }
+    hash.update("\0");
   }
-  return salida;
+  return hash.digest("hex");
+}
+
+function estadoFuente(archivos = archivosCodigo()) {
+  const commit = gitValor(["rev-parse", "HEAD"]);
+  const estadoGit = gitValor(["status", "--porcelain", "--untracked-files=all"]);
+  let sucio = null;
+  if (estadoGit !== null) {
+    sucio = estadoGit.split("\n").filter(Boolean).some((linea) => {
+      const ruta = linea.slice(3).split(" -> ").at(-1).replaceAll('"', "");
+      return EXTS.has(extname(ruta).toLowerCase());
+    });
+  }
+  return { commit, sucio, fingerprint: fingerprintFuente(archivos) };
+}
+
+export function evaluarFrescura(grafo) {
+  if (!grafo || grafo.version !== 2 || !grafo.fuente?.fingerprint) {
+    return { fresco: false, razon: "metadata ausente o formato antiguo" };
+  }
+  const actual = estadoFuente();
+  const fresco = grafo.fuente.commit === actual.commit &&
+    grafo.fuente.sucio === actual.sucio &&
+    grafo.fuente.fingerprint === actual.fingerprint;
+  return {
+    fresco,
+    razon: fresco ? "commit/fingerprint coinciden" : "commit, working tree o fingerprint difieren",
+    actual,
+  };
 }
 
 // Quita comentarios antes de buscar imports. Sin esto, un import comentado o
@@ -134,7 +175,7 @@ function resolver(espec, desde, conjunto) {
 }
 
 function generar() {
-  const archivos = archivosCodigo(RAIZ, RAIZ, []);
+  const archivos = archivosCodigo();
   const conjunto = new Set(archivos);
   const aristas = {}; const externos = {};
   for (const a of archivos) {
@@ -149,15 +190,22 @@ function generar() {
     if (deps.size) aristas[a] = [...deps];
     if (ext.size) externos[a] = [...ext];
   }
-  let commit = null;
-  try { commit = execFileSync("git", ["-C", RAIZ, "rev-parse", "--short", "HEAD"], { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {}
-  const grafo = { generado: new Date().toISOString(), commit, archivos: archivos.length, aristas, externos };
+  const fuente = estadoFuente(archivos);
+  const grafo = {
+    version: 2,
+    generado: new Date().toISOString(),
+    commit: fuente.commit,
+    fuente,
+    archivos: archivos.length,
+    aristas,
+    externos,
+  };
   mkdirSync(join(RAIZ, ".fabrica"), { recursive: true });
   const tmp = ARCHIVO + ".tmp";
   writeFileSync(tmp, JSON.stringify(grafo) + "\n", "utf8");
   renameSync(tmp, ARCHIVO);
   const nAristas = Object.values(aristas).reduce((s, d) => s + d.length, 0);
-  console.log(`Grafo generado: ${archivos.length} archivos, ${nAristas} dependencias internas (commit ${commit ?? "sin git"}).`);
+  console.log(`Grafo generado: ${archivos.length} archivos, ${nAristas} dependencias internas (commit ${fuente.commit ?? "sin git"}).`);
   return grafo;
 }
 
@@ -167,8 +215,13 @@ export function cargar() {
 
 export function cargarOGenerar() {
   const g = cargar();
-  if (g) return g;
-  console.log("(sin grafo previo — generando)");
+  if (g) {
+    const frescura = evaluarFrescura(g);
+    if (frescura.fresco) return g;
+    console.log(`(grafo no reutilizable: ${frescura.razon} — regenerando)`);
+  } else {
+    console.log("(sin grafo previo — generando)");
+  }
   return generar();
 }
 
@@ -242,14 +295,9 @@ switch (cmd) {
   case "frescura": {
     const g = cargar();
     if (!g) { console.log("Sin grafo. Genera: node grafo.mjs generar"); break; }
-    const desde = new Date(g.generado).getTime();
-    const actuales = archivosCodigo(RAIZ, RAIZ, []);
-    let cambiados = 0;
-    for (const a of actuales) { try { if (statSync(join(RAIZ, a)).mtimeMs > desde) cambiados++; } catch {} }
-    const nuevos = actuales.length - g.archivos;
-    const pct = g.archivos ? Math.round((cambiados / g.archivos) * 100) : 0;
-    console.log(`Grafo de ${g.generado.slice(0, 16)} (commit ${g.commit ?? "—"}): ${cambiados} modificados desde entonces (${pct}%), ${nuevos >= 0 ? "+" + nuevos : nuevos} archivos.`);
-    console.log(pct > 10 || Math.abs(nuevos) > 3 ? "VEREDICTO: NO CONFIABLE — regenera con: node grafo.mjs generar" : "VEREDICTO: confiable.");
+    const frescura = evaluarFrescura(g);
+    console.log(`Grafo de ${g.generado?.slice(0, 16) ?? "fecha desconocida"} (commit ${g.commit ?? "—"}): ${frescura.razon}.`);
+    console.log(frescura.fresco ? "VEREDICTO: confiable (metadata y fingerprint coinciden)." : "VEREDICTO: NO CONFIABLE — regenera con: node grafo.mjs generar");
     break;
   }
 
