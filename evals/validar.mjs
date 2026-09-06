@@ -9,6 +9,7 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
+import { prepararVeredicto } from "./veredicto.mjs";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fallos = [];
@@ -276,7 +277,17 @@ async function ejecutarPrueba(rutaRel, nombre) {
     return;
   }
 
-  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: LIMITE_MS });
+  const dirTraza = mkdtempSync(join(tmpdir(), "repofibe-eval-traza-"));
+  let r;
+  try {
+    r = spawnSync(process.execPath, [ruta], {
+      encoding: "utf8",
+      timeout: LIMITE_MS,
+      env: { ...process.env, REPOFIBE_TRAZA_DIR: dirTraza },
+    });
+  } finally {
+    rmSync(dirTraza, { recursive: true, force: true });
+  }
 
   if (r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal)) {
     fallo(`${rutaRel}: TIMEOUT tras ${LIMITE_MS / 1000}s (señal ${r.signal ?? "?"}). No es un fallo lógico: la prueba no alcanzó a terminar.`);
@@ -320,8 +331,18 @@ await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
 await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
+await ejecutarPrueba("evals/seguridad/veredicto.mjs", "Veredicto de evals");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
+const trazaFinal = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+const veredictoFinal = prepararVeredicto({ fallos, trazaAntes, trazaDespues: trazaFinal,
+  mensajeContaminacion: "la suite escribió en la telemetría REAL (.fabrica/traza.jsonl)" });
+process.exitCode = veredictoFinal.exitCode;
+if (veredictoFinal.fallos.length) {
+  console.error(`\nFALLOS (${veredictoFinal.fallos.length}):`);
+  for (const f of veredictoFinal.fallos) console.error(`  - ${f}`);
+  process.exit(1);
+}
 if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);
   for (const f of fallos) console.error(`  ✗ ${f}`);
