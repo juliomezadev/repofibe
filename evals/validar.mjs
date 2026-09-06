@@ -310,6 +310,7 @@ async function ejecutarPrueba(rutaRel, nombre) {
 
 await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
 await ejecutarPrueba("evals/seguridad/evaluaciones-recursivas.mjs", "Evaluaciones recursivas");
+await ejecutarPrueba("evals/seguridad/contrato-cierre.mjs", "Contrato de cierre de skills");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
@@ -328,12 +329,15 @@ await ejecutarPrueba("evals/seguridad/memoria-confianza.mjs", "Frontera de confi
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
 await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
+await ejecutarPrueba("evals/nucleo/grafo-frescura.mjs", "Frescura del grafo");
+await ejecutarPrueba("evals/nucleo/estado-schema.mjs", "Esquema persistido del estado");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/qaonline-persistencia.mjs", "QA en Vivo (sesión persistente)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
 await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
 await ejecutarPrueba("evals/nucleo/sync-auth.mjs", "Sync (auth local)");
+await ejecutarPrueba("evals/nucleo/sync-pull.mjs", "Sync pull (errores reales)");
 await ejecutarPrueba("evals/seguridad/veredicto.mjs", "Veredicto de evals");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
