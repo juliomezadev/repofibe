@@ -22,7 +22,7 @@
 //
 // Es tier 1: gratis, sin red, corre con el resto.
 
-import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { descubrirArchivos } from "../nucleo/archivos.mjs";
