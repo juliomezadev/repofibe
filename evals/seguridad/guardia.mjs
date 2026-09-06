@@ -63,6 +63,9 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
     ["git restore .", "idem con git restore — evadía antes"],
     ["git stash clear", "borra trabajo guardado"],
     ["git push --force origin main", "push forzado"],
+    ["git push -f origin main", "push forzado con flag corto"],
+    ["git push --force --force-with-lease origin main", "force combinado con lease"],
+    ["git push --force-with-lease --force origin main", "force combinado despuÃ©s de lease"],
     ["git clean -fd", "borra no versionados"],
     ["DROP TABLE usuarios", "SQL destructivo"],
   ];
@@ -140,4 +143,4 @@ if (fallos.length) {
   for (const f of fallos) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log("ok: guardia verificado por evasión (detiene 18 destructivos, no molesta en 16 cotidianos, /guardian funcional)");
+console.log("ok: guardia verificado por evasión (destructivos y cotidianos, /guardian funcional)");

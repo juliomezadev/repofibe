@@ -23,6 +23,9 @@ import { join, resolve, sep } from "node:path";
 let registrar = () => false;
 try { ({ registrar } = await import("../nucleo/traza.mjs")); } catch {}
 
+let analizarGitPush = () => ({ requiereProteccion: false });
+try { ({ analizarGitPush } = await import("../nucleo/politica-riesgo.mjs")); } catch {}
+
 function leerJson(ruta) {
   try { return JSON.parse(readFileSync(ruta, "utf8")); } catch { return null; }
 }
@@ -73,7 +76,6 @@ const DESTRUCTIVOS = [
   [/\bRemove-Item\b[^|;]*-Force\b[^|;]*-Recurse\b/i, "Remove-Item -Force -Recurse"],
   [/\bgit\s+reset\s+--hard\b/i, "git reset --hard (descarta cambios locales)"],
   [/\bgit\s+clean\s+-[a-z]*f/i, "git clean -f (borra archivos no versionados)"],
-  [/\bgit\s+push\b(?![^\n]*--force-with-lease)[^\n]*(--force\b|\s-f\b)/i, "git push --force sin --force-with-lease"],
   [/\bgit\s+branch\s+-D\b/i, "borrado forzado de rama"],
   [/\b(DROP\s+(TABLE|DATABASE|SCHEMA)|TRUNCATE\s+TABLE)\b/i, "SQL destructivo"],
   [/\b(del|erase)\s+(\/[a-z]\s+)*\/s\b/i, "del /s (borrado recursivo cmd)"],
@@ -152,6 +154,10 @@ try {
     const config = leerJson(join(cwd, ".fabrica", "guardia.json"));
     if (config && config.activo === false) process.exit(0); // guardia apagada explícitamente
     const comando = String(input.command ?? "");
+    const push = analizarGitPush(comando);
+    if (push.requiereProteccion) {
+      responder("ask", "GUARDIA repofibe: git push incluye --force/-f. Confirma que el push forzado es intencional antes de ejecutarlo.");
+    }
     for (const [patron, descripcion] of DESTRUCTIVOS) {
       if (patron.test(comando)) {
         responder("ask",
