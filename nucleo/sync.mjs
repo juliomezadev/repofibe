@@ -15,6 +15,40 @@ function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
 }
 
+function textoErrorGit(error) {
+  return [error?.stderr, error?.stdout, error?.message]
+    .filter(Boolean)
+    .map((valor) => Buffer.isBuffer(valor) ? valor.toString("utf8") : String(valor))
+    .join("\n");
+}
+
+export function clasificarErrorSync(error, { conflicto = false } = {}) {
+  const salida = textoErrorGit(error);
+  if (conflicto || /conflict|unmerged|merge failed/i.test(salida)) return "conflicto";
+  if (/repository .*not found|does not appear to be a git repository|no such remote|remote .*does not exist/i.test(salida)) return "remoto-inexistente";
+  if (/authentication failed|could not read from remote|permission denied|access denied|invalid username|terminal prompts disabled/i.test(salida)) return "autenticacion";
+  if (/could not resolve host|connection .*failed|connection timed out|timed out|network is unreachable|unable to access/i.test(salida)) return "red";
+  return "error-git";
+}
+
+function errorSync(codigo, error) {
+  const fallo = new Error(`Sync pull falló (${codigo}): ${textoErrorGit(error).trim() || "git devolvió un error"}`);
+  fallo.codigo = codigo;
+  fallo.syncSuccess = false;
+  fallo.causa = error;
+  return fallo;
+}
+
+function commitActual() {
+  try { return git(["-C", DIR_SYNC, "rev-parse", "HEAD"]).trim(); }
+  catch { return null; }
+}
+
+function tieneConflictos() {
+  try { return Boolean(git(["-C", DIR_SYNC, "diff", "--name-only", "--diff-filter=U"]).trim()); }
+  catch { return false; }
+}
+
 function cargarConfig() {
   if (!existsSync(CONFIG_FILE)) return null;
   return JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
@@ -167,19 +201,27 @@ export async function pull(dirFabrica) {
   if (!config) throw new Error("No hay repo de sync configurado — ejecuta: sync.mjs configurar <url-repo-git-privado>");
 
   if (!existsSync(DIR_SYNC)) {
-    git(["clone", config.repo, DIR_SYNC]);
+    try {
+      git(["clone", config.repo, DIR_SYNC]);
+    } catch (e) {
+      throw errorSync(clasificarErrorSync(e), e);
+    }
   }
 
+  const commitAntes = commitActual();
   try {
     git(["-C", DIR_SYNC, "pull", "--quiet"]);
   } catch (e) {
-    console.log("Auto-resolviendo pull de sync...");
+    const conflicto = tieneConflictos();
+    throw errorSync(clasificarErrorSync(e, { conflicto }), e);
   }
+  const commitDespues = commitActual();
+  const resultadoPull = commitAntes && commitAntes === commitDespues ? "sin-cambios" : "actualizado";
 
   const syncFabrica = join(DIR_SYNC, "fabrica");
   if (!existsSync(syncFabrica)) {
     console.log("Repo de sync vacío — sin cambios para traer.");
-    return;
+    return { ok: true, estado: resultadoPull };
   }
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
@@ -187,7 +229,8 @@ export async function pull(dirFabrica) {
     if (n > 0) console.log(`${arch}: ${n} entradas nuevas sincronizadas.`);
   }
 
-  console.log("✅ Cambios sincronizados.");
+  console.log(resultadoPull === "sin-cambios" ? "✅ Sync ya estaba actualizado." : "✅ Cambios sincronizados.");
+  return { ok: true, estado: resultadoPull };
 }
 
 export function configurar(repoUrl) {
