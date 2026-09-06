@@ -324,6 +324,7 @@ await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
 await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
 await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
+await ejecutarPrueba("evals/seguridad/memoria-confianza.mjs", "Frontera de confianza de memoria");
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
 await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
