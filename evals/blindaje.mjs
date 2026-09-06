@@ -25,6 +25,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { descubrirArchivos } from "../nucleo/archivos.mjs";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fallos = [];
@@ -32,14 +33,7 @@ const fallo = (m) => fallos.push(m);
 const ok = (m) => console.log(`  ok: ${m}`);
 
 function archivosBajo(dir, ext = ".mjs") {
-  if (!existsSync(dir)) return [];
-  const salida = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) salida.push(...archivosBajo(p, ext));
-    else if (e.name.endsWith(ext)) salida.push(p);
-  }
-  return salida;
+  return descubrirArchivos(dir, { extensiones: [ext] });
 }
 
 const rel = (p) => p.replace(RAIZ, "").replaceAll("\\", "/").replace(/^\//, "");
@@ -76,7 +70,8 @@ const rel = (p) => p.replace(RAIZ, "").replaceAll("\\", "/").replace(/^\//, "");
 // referencia ni una skill, ni un hook, ni otro módulo, ni una eval, o está
 // muerto o está desconectado — ambas cosas hay que saberlas.
 {
-  const modulos = readdirSync(join(RAIZ, "nucleo")).filter((f) => f.endsWith(".mjs")).map((f) => f.replace(/\.mjs$/, ""));
+  const modulos = archivosBajo(join(RAIZ, "nucleo"))
+    .map((p) => rel(p).replace(/^nucleo\//, "").replace(/\.mjs$/, ""));
 
   const fuentes = [
     ...archivosBajo(join(RAIZ, "nucleo")),
@@ -90,8 +85,12 @@ const rel = (p) => p.replace(RAIZ, "").replaceAll("\\", "/").replace(/^\//, "");
   const huerfanos = [];
   const soloEvals = [];
   for (const m of modulos) {
-    const patron = new RegExp(`\\b${m}\\.mjs\\b|nucleo/${m}\\b`);
-    const referentes = fuentes.filter((p) => basename(p) !== `${m}.mjs` && patron.test(readFileSync(p, "utf8")));
+    const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const rutaEscapada = escapar(m);
+    const baseEscapada = escapar(m.split("/").at(-1));
+    const patron = new RegExp(`(?:nucleo/)?${rutaEscapada}\\.mjs\\b|(?:\\./|\\.\\./)${baseEscapada}\\.mjs\\b`);
+    const propia = `nucleo/${m}.mjs`;
+    const referentes = fuentes.filter((p) => rel(p) !== propia && patron.test(readFileSync(p, "utf8")));
     if (referentes.length === 0) { huerfanos.push(m); continue; }
     // Un módulo al que SOLO lo referencian sus propias evals está probado
     // pero desconectado: nada en producción lo llama. La primera versión de
@@ -119,13 +118,13 @@ const rel = (p) => p.replace(RAIZ, "").replaceAll("\\", "/").replace(/^\//, "");
 // Una skill que promete "corre sobre nucleo/x.mjs" y ese archivo no existe es
 // una promesa que el usuario descubre fallando.
 {
-  const existentes = new Set(readdirSync(join(RAIZ, "nucleo")).filter((f) => f.endsWith(".mjs")));
+  const existentes = new Set(archivosBajo(join(RAIZ, "nucleo")).map(rel));
   const rotas = [];
 
   for (const p of archivosBajo(join(RAIZ, "skills"), ".md")) {
     const t = readFileSync(p, "utf8");
-    for (const m of t.matchAll(/nucleo\/([\w.-]+\.mjs)/g)) {
-      if (!existentes.has(m[1])) rotas.push(`${rel(p)} → nucleo/${m[1]}`);
+    for (const m of t.matchAll(/nucleo\/([\w./-]+\.mjs)/g)) {
+      if (!existentes.has(`nucleo/${m[1]}`)) rotas.push(`${rel(p)} → nucleo/${m[1]}`);
     }
   }
 

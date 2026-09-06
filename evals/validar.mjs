@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
 import { prepararVeredicto } from "./veredicto.mjs";
+import { descubrirArchivos } from "../nucleo/archivos.mjs";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fallos = [];
@@ -80,11 +81,9 @@ try {
 } catch (e) { fallo(`hooks.json: ${e.message}`); }
 
 // ── 4. Sintaxis de todos los .mjs ────────────────────────────────────────────
-for (const dir of ["nucleo", "hooks", "evals"]) {
-  for (const f of readdirSync(join(RAIZ, dir)).filter((f) => f.endsWith(".mjs"))) {
-    const r = spawnSync(process.execPath, ["--check", join(RAIZ, dir, f)], { encoding: "utf8" });
-    if (r.status !== 0) fallo(`${dir}/${f}: error de sintaxis → ${r.stderr.trim().split("\n")[0]}`);
-  }
+for (const ruta of descubrirArchivos(RAIZ, { extensiones: [".mjs"] })) {
+  const r = spawnSync(process.execPath, ["--check", ruta], { encoding: "utf8" });
+  if (r.status !== 0) fallo(`${ruta.replace(RAIZ, "").replaceAll("\\", "/")}: error de sintaxis → ${r.stderr.trim().split("\n")[0]}`);
 }
 if (!fallos.some((f) => f.includes("sintaxis"))) ok("sintaxis de todos los .mjs");
 
@@ -310,6 +309,7 @@ async function ejecutarPrueba(rutaRel, nombre) {
 }
 
 await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
+await ejecutarPrueba("evals/seguridad/evaluaciones-recursivas.mjs", "Evaluaciones recursivas");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
