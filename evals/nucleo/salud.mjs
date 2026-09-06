@@ -40,7 +40,13 @@ async function probarMedicionYComparacion() {
   let modo = "ok";
   const servidor = createServer((req, res) => {
     if (modo === "ok") { res.writeHead(200, { "content-type": "text/plain" }); res.end("hola mundo"); }
+    else if (modo === "sin-contenido") { res.writeHead(204); res.end(); }
     else if (modo === "error") { res.writeHead(500); res.end("error interno"); }
+    else if (modo === "no-encontrado") { res.writeHead(404); res.end("no encontrado"); }
+    else if (modo === "redirige") {
+      if (req.url === "/salud-final") { res.writeHead(200); res.end("salud final"); }
+      else { res.writeHead(302, { location: "/salud-final" }); res.end(); }
+    }
     else if (modo === "lento") { setTimeout(() => { res.writeHead(200); res.end("hola mundo, tarde"); }, 400); }
   });
   await new Promise((r) => servidor.listen(0, "127.0.0.1", r));
@@ -54,6 +60,26 @@ async function probarMedicionYComparacion() {
     assert.equal(m1.codigo, 200);
     assert.equal(typeof m1.tiempoMs, "number");
     assert.equal(typeof m1.hashContenido, "string");
+
+    modo = "sin-contenido";
+    const m204 = await medirSalud(url);
+    assert.equal(m204.ok, true);
+    assert.equal(m204.codigo, 204);
+
+    modo = "redirige";
+    const m302 = await medirSalud(url);
+    assert.equal(m302.ok, true, "302 seguido hasta 200 debe ser explícitamente saludable");
+    assert.equal(m302.codigo, 200);
+
+    modo = "no-encontrado";
+    const m404 = await medirSalud(url);
+    assert.equal(m404.ok, false);
+    assert.equal(m404.codigo, 404);
+
+    modo = "error";
+    const m500 = await medirSalud(url);
+    assert.equal(m500.ok, false);
+    assert.equal(m500.codigo, 500);
 
     // medirSalud contra un puerto que no escucha: falla con evidencia, no explota.
     const mFallo = await medirSalud("http://127.0.0.1:1/", "", 1500);

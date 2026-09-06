@@ -50,7 +50,7 @@ export async function medirSalud(url, rutaSalud = "", timeoutMs = 8000) {
     const tiempoMs = Date.now() - inicio;
     const recorte = buffer.slice(0, MAX_BYTES_HASH);
     const hash = createHash("sha256").update(Buffer.from(recorte)).digest("hex").slice(0, 16);
-    return { url: destino, ok: true, codigo: resp.status, tiempoMs, tamanoBytes: buffer.byteLength, hashContenido: hash, fecha: new Date().toISOString() };
+    return { url: destino, ok: resp.ok, codigo: resp.status, tiempoMs, tamanoBytes: buffer.byteLength, hashContenido: hash, fecha: new Date().toISOString() };
   } catch (e) {
     return { url: destino, ok: false, error: e.name === "AbortError" ? "timeout" : e.message, fecha: new Date().toISOString() };
   } finally {
