@@ -80,9 +80,16 @@ try {
   git(["commit", "-q", "-m", "remote auth must not sync"], WRITER);
   git(["push", "-q"], WRITER);
 
-  await pull(fabrica);
+  const pullLogs = [];
+  console.log = (...args) => pullLogs.push(args.join(" "));
+  try {
+    await pull(fabrica);
+  } finally {
+    console.log = logOriginal;
+  }
   assert.equal(readFileSync(authPath, "utf8"), authOriginal, "pull no debe sobreescribir auth local");
   assert.equal(existsSync(join(auth, "remota.json")), false, "pull no debe crear auth desde remoto");
+  assert.doesNotMatch([...logs, ...pullLogs].join("\n"), new RegExp(token), "push/pull no deben imprimir tokens");
   git(["clone", "-q", REMOTE, INSPECT]);
   assert.match(readFileSync(join(INSPECT, "fabrica", "memoria.jsonl"), "utf8"), /memoria compartible/);
   console.log("ok: push/pull de git preserva auth local, excluye auth del remoto y sincroniza memoria");
