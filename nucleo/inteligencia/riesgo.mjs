@@ -1,5 +1,7 @@
 // riesgo.mjs — clasificación determinista y explicable de riesgo.
 
+import { analizarGitPush } from "../politica-riesgo.mjs";
+
 const quitarAcentos = (valor) => String(valor ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const REGLAS = [
@@ -24,11 +26,16 @@ function textoDeEntrada(entrada) {
 }
 
 export function clasificarRiesgo(entrada) {
-  const texto = quitarAcentos(textoDeEntrada(entrada));
+  const entradaTexto = textoDeEntrada(entrada);
+  const texto = quitarAcentos(entradaTexto);
   const señales = [];
   for (const regla of REGLAS) {
     const coincidencia = regla.patrones.find((patron) => patron.test(texto));
     if (coincidencia) señales.push({ clave: regla.clave, nivel: regla.nivel, peso: regla.peso, evidencia: coincidencia.source });
+  }
+  const push = analizarGitPush(entradaTexto, { buscarEnTexto: true });
+  if (push.requiereProteccion && !señales.some((señal) => señal.clave === "destructivo")) {
+    señales.push({ clave: "destructivo", nivel: "alto", peso: 6, evidencia: "git push --force/-f" });
   }
   const puntuacion = señales.reduce((total, señal) => total + señal.peso, 0);
   const nivel = puntuacion >= 5 ? "alto" : puntuacion >= 2 ? "medio" : "bajo";
@@ -40,4 +47,3 @@ export function clasificarRiesgo(entrada) {
     explicacion: señales.length ? "Clasificación basada en señales del objetivo y alcance." : "No se detectaron señales de riesgo operativo.",
   };
 }
-

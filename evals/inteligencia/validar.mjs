@@ -196,4 +196,17 @@ ok("CLI valida un archivo de estado y usa código de salida", () => {
   }
 });
 
+ok("clasifica git push --force como destructivo, incluso combinado con lease", () => {
+  for (const objetivo of [
+    "ejecuta git push --force origin main",
+    "ejecuta git push --force --force-with-lease origin main",
+    "ejecuta git push --force-with-lease --force origin main",
+  ]) {
+    const riesgo = clasificarRiesgo({ objetivo });
+    assert.equal(riesgo.nivel, "alto", objetivo);
+    assert.ok(riesgo.requiereAprobacion, objetivo);
+  }
+  assert.equal(clasificarRiesgo({ objetivo: "ejecuta git push --force-with-lease origin main" }).nivel, "bajo");
+});
+
 console.log(`\nInteligencia: ${pasadas} pruebas pasaron.`);
