@@ -1,0 +1,13 @@
+{
+  "name": "repofibe",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup:chromium": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "1.62.0"
+  }
+}

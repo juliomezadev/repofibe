@@ -331,6 +331,7 @@ await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
 await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
 await ejecutarPrueba("evals/nucleo/grafo-frescura.mjs", "Frescura del grafo");
 await ejecutarPrueba("evals/nucleo/estado-schema.mjs", "Esquema persistido del estado");
+await ejecutarPrueba("evals/nucleo/dependencias.mjs", "Dependencias reproducibles");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/qaonline-persistencia.mjs", "QA en Vivo (sesión persistente)");
