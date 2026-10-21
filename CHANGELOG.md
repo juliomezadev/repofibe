@@ -2,18 +2,33 @@
 
 Todas las novedades de repofibe, versión por versión.
 
-## [Unreleased] — 2026-09-06
-### Corregido — reproducibilidad y documentación de la estabilización inicial
-- `package.json` y `package-lock.json` ahora están versionados. Playwright
-  `1.62.0` es dependencia de desarrollo fijada y el mínimo declarado de Node
-  es 20.11.0.
-- `npm ci` seguido de `npm run setup:chromium` reproduce las pruebas de
-  navegador desde un checkout limpio usando sólo Chromium.
-- Tier 1, Tier 2, QA online, navegador, sync, grafo, estado y contrato de
-  cierre documentan sus estados `PASS`, `SKIPPED`, `OPTIONAL` o `MANUAL` sin
-  convertir omisiones en aprobaciones.
-- Los archivos locales no rastreados del escáner experimental de cadena de
-  suministro fueron auditados y rechazados; no forman parte del producto.
+## [Unreleased] — candidato 0.7.0
+
+### Mejoras
+- El instalador y el paquete fijan Node.js 22 como mínimo y recomiendan Node
+  24. Playwright `1.64.1` queda fijado como dependencia de desarrollo para
+  preparar pruebas de navegador reproducibles.
+- Las evals Tier 1 y Tier 2 tienen trabajos separados en CI para Windows,
+  Ubuntu y macOS, con Node 22 y 24 (macOS/Node 22 está excluido). Tier 1
+  prepara Chromium antes de ejecutar las pruebas.
+- Las pruebas de gates pueden guardar recibos locales que enlazan resultado,
+  gate, commit, fuentes y logs redactados. La verificación vuelve a comprobar
+  esas referencias contra el estado actual del workspace.
+- La instalación de Claude Code distingue un plugin registrado de uno cuya
+  activación se haya observado. Si la CLI no es compatible o encuentra un
+  estado que no puede atribuir con seguridad, conserva lo existente y usa
+  copias de skills con hooks en `settings.json`.
+- El refresco y rollback evitan restaurar rutas que hayan cambiado o se hayan
+  convertido en enlaces; se informa cuando una compensación externa no pudo
+  confirmarse.
+
+### Alcance de verificación
+- La suite con juez LLM requiere `ANTHROPIC_API_KEY`; si no se ejecuta, queda
+  `OMITIDA`, nunca aprobada. Los fixtures de symlinks o junctions también
+  permanecen pendientes en sistemas que no permitan crearlos.
+- Los recibos locales no son firmas criptográficas ni un sandbox. La
+  activación del plugin nativo depende del host y no se infiere sólo de que la
+  CLI lo haya registrado.
 
 ## [0.6.2] — 2026-07-25
 ### Corregido — la capa de inteligencia estaba construida pero SIN CONECTAR

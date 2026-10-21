@@ -17,7 +17,7 @@ y rediseñado desde cero con una tesis distinta:
 
 | | gstack | repofibe |
 |---|---|---|
-| **Instalación** | git clone + symlinks + editar CLAUDE.md (los symlinks se rompen en Windows) | Plugin nativo de Claude Code / copias planas. Windows = ciudadano de primera |
+| **Instalación** | git clone + symlinks + editar CLAUDE.md (los symlinks se rompen en Windows) | Plugin nativo de Claude Code / copias planas sin requisito de symlinks |
 | **Guardias** | `/careful` es un prompt: el modelo puede olvidarlo | Hook PreToolUse: el harness lo ejecuta SIEMPRE (destructivos → confirmar; congelado → denegar) |
 | **Estado del sprint** | Implícito en documentos sueltos | `.fabrica/sprint.json` explícito: etapa, historial, pendientes. Cualquier sesión retoma donde quedó |
 | **Docs de skills** | Plantillas + build step (drift si no rebuildeas) | Sin codegen: un SKILL.md por skill, bloques compartidos leídos en runtime |
@@ -27,9 +27,10 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-**Requisitos:** [Node.js](https://nodejs.org) 20.11+ y Git. El núcleo no tiene
-dependencias runtime externas. Las pruebas de navegador requieren npm, la
-dependencia de desarrollo Playwright fijada en `package.json` y Chromium.
+**Requisitos:** [Node.js](https://nodejs.org) 22 o superior (24 recomendado)
+y Git. El núcleo no tiene dependencias runtime externas. Las pruebas de
+navegador requieren npm, Playwright `1.64.1` —fijado como dependencia de
+desarrollo— y Chromium.
 
 > **Nota de honestidad:** algunas capacidades avanzadas usan herramientas
 > Playwright se importa dinámicamente para navegador/QA/scrape (`/qa`,
@@ -85,11 +86,17 @@ Es idempotente y seguro: registra los hooks en `~/.claude/settings.json`
 respetando tu configuración y la de otros plugins, respalda tu archivo original
 en `settings.json.bak-repofibe` y no toca nada si el JSON está corrupto.
 
-El camino alternativo es el plugin nativo, que trae los hooks incluidos:
-`claude plugin marketplace add <ruta-al-clon>` y
-`claude plugin install repofibe@repofibe-marketplace`. El instalador lo intenta
-solo, pero si la CLI de `claude` está ocupada cae a modo copia — y en modo copia
-los hooks hay que activarlos con el comando de arriba.
+En Claude Code, el instalador intenta registrar el marketplace local e instalar
+el plugin nativo en el ámbito del usuario. Si la CLI no ofrece el JSON esperado,
+el estado entra en conflicto o la instalación falla, usa copias planas y
+registra los hooks en `~/.claude/settings.json`. Puedes pedir sólo esa
+activación con `node nucleo/instalar.mjs --hooks`.
+
+Comprueba el resultado con `node nucleo/diagnostico.mjs`. En modo copia informa
+si ambos hooks aparecen en `settings.json`; en modo plugin puede informar
+`registrado_no_verificado`: el registro del plugin no demuestra que Claude Code
+lo haya cargado. Reinicia Claude Code después de una instalación o cambio de
+hooks y confirma su actividad desde el host.
 
 > **Esto no es teórico.** En la instalación del propio autor, las 33 skills
 > estaban puestas y los hooks llevaban versiones sin correr: el guardia
@@ -183,9 +190,16 @@ secreto y comprobando que no llega al archivo.
 ## Calidad del propio repo
 
 ```bash
-node evals/validar.mjs   # tier 1: gratis, corre en cada push
-node evals/tier2.mjs     # tier 2: E2E, sesión de sprint completa simulada
+npm ci
+npm run setup:chromium
+node evals/validar.mjs
+node evals/tier2.mjs
 ```
+
+El [workflow de CI](.github/workflows/evals.yml) ejecuta Tier 1 y Tier 2 por
+separado. Tier 1 prepara Playwright y Chromium; Tier 2 no los necesita. La
+matriz usa Ubuntu y Windows con Node 22 y 24, y macOS con Node 24 (macOS/Node
+22 está excluido en el workflow actual).
 
 Tier 1 valida frontmatter y convenciones de las 33 skills, manifiestos,
 hooks — y ejecuta de verdad `estado`, `memoria`, `guardia`, `grafo`,
@@ -195,10 +209,16 @@ del congelado → deny", y detección de prompt-injection con Chromium real
 cuando están instalados Playwright y Chromium). Tier 2 encadena una sesión de sprint
 completa (pensar→retro, ~15 subprocesos reales) verificando que el estado
 fluye correctamente entre `estado.mjs`, `checkpoint.mjs`, `grafo.mjs` y
-`pruebas.mjs` — el tipo de bug de integración que tests aislados no
-atrapan. La suite LLM de Tier 2 requiere `ANTHROPIC_API_KEY` y queda
-`SKIPPED` si falta; no cuenta como PASS. Ambos corren como jobs separados en
-CI (`.github/workflows/evals.yml`).
+`pruebas.mjs` — el tipo de bug de integración que tests aislados no atrapan.
+Tier 2 incluye además una suite de cinco skills juzgadas por un modelo; sin
+`ANTHROPIC_API_KEY` esa suite queda `OMITIDA` y no cuenta como verificada ni
+como PASS. El workflow no inyecta esa credencial, así que CI no ejecuta esa
+evaluación de pago. Las evals que necesitan crear symlinks o junctions pueden
+marcar ese caso como omitido si los permisos del sistema operativo lo impiden;
+un caso omitido tampoco acredita cobertura. Consulta los límites de plataforma,
+recibos y rollback en [Robustez 0.7.0](docs/ROBUSTEZ-0.7.0.md).
+La evaluación propuesta de Harness² está separada del producto y no añade
+dependencias: [diseño del experimento](docs/EXPERIMENTO-HARNESS2.md).
 
 El estado persistido y la memoria contienen datos locales del usuario; las
 sesiones `storageState` viven en `.fabrica/auth/` y no entran en sync. La
