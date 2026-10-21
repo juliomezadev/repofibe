@@ -57,15 +57,61 @@ después de confirmar que no quedan plugins asociados. Si la CLI no confirma el
 estado final, el instalador informa que la compensación quedó incompleta; no
 debe asumirse que el estado externo se restauró automáticamente.
 
-## Alcance de los recibos de pruebas
+## Registro de instalación y recibos de ejecución
 
-Los recibos del runner de gates viven en `.fabrica/ejecuciones/`. Incluyen la
-identidad del workspace, commit, fingerprint de fuentes observadas, gate,
-comando, hash de argumentos, salida del proceso y referencias a logs
-redactados. La evidencia guarda el identificador y el SHA-256 del recibo. Al
-verificarla, Repofibe vuelve a comprobar el recibo, los logs y la huella actual
-del workspace. El sync de Repofibe sólo transporta memoria y notas de dominio;
-no incluye esos recibos.
+El registro local de instalación está en `~/.repofibe/instalado.json`. Su
+versión de esquema actual es 2. No es un recibo firmado: es el inventario que
+el instalador usa para reconocer sus archivos, bloques y destinos durante un
+refresco o una desinstalación. Sus campos son:
+
+| Campo | Semántica implementada |
+|---|---|
+| `version` | Versión del esquema del registro (`2`), no la versión de Repofibe. |
+| `distribucion` | Identidad de la copia compartida: `version` y `commit` del manifiesto instalado. |
+| `rutas` | Rutas absolutas de las raíces donde se registró contenido de Repofibe, incluida la aplicación compartida y las carpetas de skills. |
+| `archivos` | Entradas `{ ruta, sha256 }` por archivo regular registrado. El hash se compara con el contenido actual para decidir si el instalador puede actualizar o retirar ese archivo sin pisar una edición posterior. |
+| `bloques` | Rutas de archivos con contenido gestionado, como reglas marcadas de `AGENTS.md` o `settings.json` al registrar hooks. |
+| `bloquesPropios` | Entradas `{ ruta, sha256, creado }`: hash del bloque marcado o, para `settings.json`, del JSON registrado; `creado` indica si el archivo de destino no existía al registrarlo. El instalador conserva contenido ajeno y sólo retira un bloque marcado si su hash coincide. |
+| `directorios` | Directorios creados durante la instalación; al desinstalar sólo se quitan si siguen vacíos. |
+| `destinos` | Raíces de skills instaladas, usadas para localizar destinos durante `--refrescar`. |
+| `plugins` | Identificadores de plugin anotados en el registro. `repofibe` significa que el instalador lo registró; no demuestra que Claude Code lo haya cargado. |
+
+Las rutas son locales al equipo y pueden revelar su estructura. Los hashes
+sirven para comparar bytes; no autentican el origen ni protegen el JSON de una
+edición manual. La lista refleja el registro del instalador, no una inspección
+independiente de cada host.
+
+Los recibos del runner de gates viven en `.fabrica/ejecuciones/` y son un
+contrato distinto del registro de instalación. Cada ejecución escribe
+`run-<uuid>.json` y los archivos `run-<uuid>.stdout.log` y
+`run-<uuid>.stderr.log`. El recibo v1 contiene estos campos:
+
+| Campo | Semántica implementada |
+|---|---|
+| `version`, `runnerVersion` | Versiones del contrato del recibo (`1`) y del runner (`repofibe-ejecuciones/1`). |
+| `runId` | Identificador aleatorio `run-<uuid>` compartido por el recibo y los logs. |
+| `gateId` | Identificador del gate solicitado por el descriptor de prueba. |
+| `comando` | Texto del ejecutable tal como llegó en el descriptor; no lo redacta el runner. |
+| `argsSha256` | SHA-256 de la serialización JSON de los argumentos originales. No permite reconstruirlos directamente, pero valores adivinables se pueden comparar por fuerza bruta. |
+| `argsRedactados` | Representación para inspección: argumentos que parecen flags (`-x` o `--nombre`) quedan visibles; los demás se sustituyen por `<REDACTADO:n bytes>`. No es una copia ejecutable de los argumentos. |
+| `workspaceId` | SHA-256 de la ruta absoluta resuelta del workspace, normalizada a barras `/` y minúsculas. Identifica esa ruta local, no una persona o repositorio global. |
+| `commit` | `HEAD` de Git al tomar la huella anterior a ejecutar el comando. |
+| `fuentesFingerprint`, `fuentes` | Huella SHA-256 agregada y lista de `{ ruta, sha256 }` observada antes del comando. Incluye todos los archivos rastreados y los no rastreados con extensiones configuradas o nombres de configuración; omite rutas que empiezan por `.fabrica/` o `.git/` y rutas que contienen `/node_modules/`. Un enlace se resume como `SYMLINK:<destino>` y una ruta ilegible o ausente con `MISSING:<error>` antes de calcular su hash. |
+| `iniciado`, `finalizado` | Tiempos ISO-8601 de inicio y fin de la ejecución. |
+| `exitCode` | Código del proceso; el runner usa `124` para timeout y `127` cuando no obtiene un estado y hay un error de lanzamiento distinto de timeout. |
+| `fuentesEstables` | `true` si `HEAD` y la huella de fuentes son iguales antes y después del comando. |
+| `hashesSalida` | SHA-256 de los textos guardados para `stdout` y `stderr`, después del redactor. |
+| `logs` | Para cada stream: ruta relativa, SHA-256, `redactado: true` y `hallazgos` (`tipo` y cantidad de patrones sustituidos). |
+
+La evidencia de gate enlaza al recibo mediante `ejecucionRef` (`runId`,
+`sha256Recibo` y `argsSha256`). Al verificar una prueba observada, Repofibe
+comprueba esa referencia y el hash del JSON; versión, gate, comando, código de
+salida y timestamp; que las fuentes permanezcan estables y coincidan con el
+commit/fingerprint actuales; y que ambos logs existan en las rutas esperadas y
+conserven sus hashes. No vuelve a ejecutar el comando. El recibo y sus logs
+deben permanecer junto al workspace para que la verificación local funcione.
+El sync de Repofibe sólo transporta memoria y notas de dominio; no incluye
+estos recibos.
 
 | Garantía implementada | Límite que permanece |
 |---|---|
@@ -75,9 +121,13 @@ no incluye esos recibos.
 | Rechaza algunos comandos de publicación explícitos (`git push`, `npm publish`, `pnpm publish`, `yarn publish`, `gh release create`). | Es una defensa contra errores evidentes, no una lista completa de comandos peligrosos ni una política de aislamiento. |
 | La verificación falla si el código fuente ya no coincide con el commit y fingerprint del recibo. | El recibo aporta trazabilidad local del estado observado, no una atestación independiente ni prueba quién lanzó el comando. |
 
-Usa estos recibos para revisar ejecuciones locales vinculadas a una revisión
-concreta. No los uses como bitácora inmutable, evidencia legal ni garantía
-contra un proceso malicioso con permisos de escritura.
+Usa el registro de instalación para entender qué rutas cree poseer el
+instalador y los recibos de gates para revisar ejecuciones locales vinculadas
+a una revisión concreta. Ninguno es una bitácora inmutable, evidencia legal,
+firma de autoría ni garantía contra un proceso con permisos de escritura.
+El redactor sólo detecta patrones conocidos y los argumentos originales no se
+guardan en claro, pero el comando, los nombres de flags, la longitud de valores
+y el hash de argumentos sí quedan en el recibo.
 
 ## Rollback y riesgos de plataforma
 
@@ -104,15 +154,60 @@ reales de una corrida limpia acreditan cada combinación. La suite con LLM queda
 fuera de esa cobertura mientras no se ejecute explícitamente con credenciales
 y presupuesto.
 
+### Si el rollback informa que quedó incompleto
+
+El instalador no ofrece un comando de reparación ni conserva una copia de
+respaldo general de los archivos previos. Las advertencias identifican la
+ruta cuyo rollback se omitió o falló; la compensación externa de Claude puede
+reportar por separado un `plugin uninstall` o `marketplace remove` pendiente.
+No supongas que el estado volvió al punto inicial ni borres esas rutas para
+forzar una reinstalación.
+
+1. Conserva la salida completa del instalador y anota cada ruta, motivo y
+   error de compensación impreso.
+2. Desde la aplicación instalada, consulta el diagnóstico de sólo lectura:
+
+   ```bash
+   cd ~/.repofibe/app
+   node nucleo/diagnostico.mjs --host claude --json
+   ```
+
+   Omite `--host claude` si Claude Code no forma parte de la instalación. El
+   diagnóstico informa `en_actualizacion` si sigue presente
+   `~/.repofibe/en-actualizacion.json`; no elimina ese marcador ni repara
+   archivos. Si el marcador permanece después de que el instalador haya
+   terminado, confirma primero que no haya otra actualización ejecutándose y
+   reconcilia manualmente el estado antes de retirarlo. El marcador sólo
+   contiene la versión, commit y hora de inicio; no contiene copias previas.
+3. Para cada ruta local indicada, inspecciona el tipo de archivo y sus bytes.
+   Compara con la versión deseada del manifiesto o con una copia previa que
+   controles. Si la ruta cambió, es un enlace o su padre es inseguro, decide
+   explícitamente qué conservar y corrige esa condición; el instalador omitió
+   la restauración precisamente para no pisarla. No hay datos suficientes en
+   el registro para reconstruir automáticamente el contenido anterior.
+4. Si el error nombra el plugin o marketplace de Claude, consulta el estado
+   actual con `claude plugin list --json` y
+   `claude plugin marketplace list --json`. Desinstala o retira algo sólo
+   después de confirmar que pertenece a esta operación y que ningún otro
+   plugin depende del marketplace. Un marketplace preexistente o compartido
+   se conserva.
+5. Vuelve a ejecutar el diagnóstico. Sólo cuando el estado observado sea el
+   que buscas, continúa con la operación que pretendías. Si el único fallo
+   fue que la aplicación local ya se actualizó pero la CLI no pudo ejecutar
+   `claude plugin update`, el mensaje del instalador indica reintentar
+   `node nucleo/instalar.mjs --refrescar`; ese reintento no revierte la
+   aplicación a la versión anterior.
+
 ## Cobertura Diataxis de esta nota
 
 | Área | Tutorial | Cómo hacer | Referencia | Explicación |
 |---|---|---|---|---|
 | Instalación de navegador | Parcial, en README | Comandos `npm ci` y Chromium | Versiones y matriz CI | Runtime sin dependencia de navegador |
-| Recibos de gates | — | Revisar límites antes de confiar | Contenido y verificación | Modelo de integridad y amenazas |
-| Plugin y rollback | Instalación básica, en README | Diagnóstico y recuperación, parcial | Estados y límites | Compensación local frente a efectos externos |
+| Registro de instalación | — | Interpretar ownership antes de refrescar/quitar | Campos v2 | Hashes locales, no firma ni prueba de activación |
+| Recibos de gates | — | Revisar y verificar evidencia local | Campos v1 y vínculo con evidencia | Modelo de integridad y amenazas |
+| Plugin y rollback | Instalación básica, en README | Pasos manuales tras rollback incompleto | Estados y límites | Compensación local frente a efectos externos |
 
-Siguen faltando un tutorial de recuperación ante rollback incompleto y una
-referencia exhaustiva de todos los campos del recibo. Ninguno es necesario
-para entender los límites documentados aquí; pueden añadirse cuando la CLI de
-gates se convierta en una interfaz estable para usuarios finales.
+Queda pendiente un tutorial guiado de instalación y recuperación de principio
+a fin. La referencia describe los campos observados en la implementación de
+0.7.0; no convierte el registro ni el formato local de recibo en interfaces
+estables o portables entre equipos.
