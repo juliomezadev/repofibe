@@ -7,6 +7,7 @@ import { readFileSync, appendFileSync, writeFileSync, mkdirSync, existsSync } fr
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { withTrace } from "./traza.mjs";
+import { conBloqueoExclusivoSync, escribirAtomicoSync } from "./persistencia.mjs";
 
 const TIPOS = ["aprendizaje", "decision", "gusto", "error", "eureka"];
 const LOCAL = join(process.cwd(), ".fabrica", "memoria.jsonl");
@@ -92,9 +93,22 @@ async function procesarBuscadorBase() {
       }
       const ruta = esGlobal ? GLOBAL : LOCAL;
       mkdirSync(dirname(ruta), { recursive: true });
-      const idUnico = Date.now().toString() + Math.random().toString(36).slice(2, 6);
-      const entrada = { id: idUnico, fecha: new Date().toISOString(), tipo, texto };
-      appendFileSync(ruta, JSON.stringify(entrada) + "\n", "utf8");
+      const agregar = () => {
+        const idUnico = Date.now().toString() + Math.random().toString(36).slice(2, 6);
+        const entrada = { id: idUnico, fecha: new Date().toISOString(), tipo, texto };
+        if (esGlobal) {
+          // La memoria global queda fuera del sync de proyecto y conserva su ruta actual.
+          appendFileSync(ruta, JSON.stringify(entrada) + "\n", "utf8");
+        } else {
+          // El append local comparte lock con sync.pull/mergeJsonl y reemplaza
+          // atómicamente una copia que conserva las líneas anteriores byte por byte.
+          const anterior = existsSync(ruta) ? readFileSync(ruta, "utf8") : "";
+          const separador = anterior === "" || anterior.endsWith("\n") ? "" : "\n";
+          escribirAtomicoSync(ruta, anterior + separador + JSON.stringify(entrada) + "\n");
+        }
+      };
+      if (esGlobal) agregar();
+      else conBloqueoExclusivoSync(`${ruta}.lock`, agregar);
       console.log(`Memoria guardada (${esGlobal ? "global" : "proyecto"}): ${texto}`);
       break;
     }

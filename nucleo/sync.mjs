@@ -2,10 +2,11 @@
 // sync.mjs — sincronización de memoria entre máquinas via git con 3-Way Merge Driver
 
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { conBloqueoExclusivoSync, escribirAtomicoSync } from "./persistencia.mjs";
 
 const SYNC_HOME = process.env.REPOFIBE_SYNC_HOME || homedir();
 const CONFIG_FILE = join(SYNC_HOME, ".repofibe", "sync-config.json");
@@ -59,53 +60,57 @@ function guardarConfig(config) {
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
+function leerLineasJsonl(ruta) {
+  if (!existsSync(ruta)) return [];
+  const texto = readFileSync(ruta, "utf8");
+  if (texto === "") return [];
+  const lineas = texto.split("\n");
+  if (texto.endsWith("\n")) lineas.pop(); // quita solo el terminador final, no líneas internas
+  lineas.forEach((linea, indice) => {
+    try { JSON.parse(linea); }
+    catch (error) { throw new Error(`JSONL inválido en ${ruta}, línea ${indice + 1}: ${error.message}`); }
+  });
+  return lineas;
+}
+
+function serializarLineasJsonl(lineas) {
+  return lineas.length ? lineas.join("\n") + "\n" : "";
+}
+
 // 3-Way Merge Driver para Git (%O ancestro, %A local, %B remoto)
 export function gitMerge3Way(ancestorPath, localPath, remotePath) {
   try {
-    // parsear NO muta el contenido: devuelve las líneas ORIGINALES intactas.
-    // La normalización de separadores (\ → /) se usa SOLO como clave de
-    // comparación para deduplicar entre máquinas (Windows vs Unix). Aplicarla
-    // al contenido escrito corrompía rutas, regex y escapes en cada merge.
-    const clave = (l) => l.replaceAll("\\", "/");
-    const parsear = (p) => {
-      if (!existsSync(p)) return [];
-      const txt = readFileSync(p, "utf8");
-      if (!txt.trim()) return [];
-      return txt.split("\n").filter(Boolean).map((l) => {
-        if (l.trim().startsWith("{")) JSON.parse(l); // valida, no muta
-        return l;
-      });
-    };
+    return conBloqueoExclusivoSync(`${localPath}.lock`, () => {
+      // Cada línea JSONL se valida antes de escribir y se compara exactamente;
+      // las barras y escapes son parte de los datos, nunca claves normalizadas.
+      const loc = leerLineasJsonl(localPath);
+      const rem = leerLineasJsonl(remotePath);
+      const anc = ancestorPath ? leerLineasJsonl(ancestorPath) : [];
 
-    const loc = parsear(localPath);
-    const rem = parsear(remotePath);
-    const anc = (ancestorPath && existsSync(ancestorPath)) ? parsear(ancestorPath) : [];
+      const ancSet = new Set(anc);
+      const locSet = new Set(loc);
+      const remSet = new Set(rem);
 
-    const ancSet = new Set(anc.map(clave));
-    const locSet = new Set(loc.map(clave));
-    const remSet = new Set(rem.map(clave));
+      const resultado = [];
+      const procesados = new Set();
 
-    const resultado = [];
-    const procesados = new Set();
-
-    // 1. Entradas de local (mantener si no fueron eliminadas en remoto o fueron creadas en local)
-    for (const l of loc) {
-      const k = clave(l);
-      if (!ancSet.has(k) || remSet.has(k)) {
-        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
+      // 1. Entradas de local (mantener si no fueron eliminadas en remoto o fueron creadas en local)
+      for (const linea of loc) {
+        if (!ancSet.has(linea) || remSet.has(linea)) {
+          if (!procesados.has(linea)) { resultado.push(linea); procesados.add(linea); }
+        }
       }
-    }
 
-    // 2. Entradas de remoto (mantener si no fueron eliminadas en local o fueron creadas en remoto)
-    for (const l of rem) {
-      const k = clave(l);
-      if (!ancSet.has(k) || locSet.has(k)) {
-        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
+      // 2. Entradas de remoto (mantener si no fueron eliminadas en local o fueron creadas en remoto)
+      for (const linea of rem) {
+        if (!ancSet.has(linea) || locSet.has(linea)) {
+          if (!procesados.has(linea)) { resultado.push(linea); procesados.add(linea); }
+        }
       }
-    }
 
-    writeFileSync(localPath, resultado.length ? resultado.join("\n") + "\n" : "");
-    return true;
+      escribirAtomicoSync(localPath, serializarLineasJsonl(resultado));
+      return true;
+    });
   } catch (e) {
     console.error("Error en 3-Way Merge Driver:", e.message);
     return false;
@@ -115,19 +120,22 @@ export function gitMerge3Way(ancestorPath, localPath, remotePath) {
 // Merge 2-Way append-only (fallback)
 export function mergeJsonl(destPath, srcPath) {
   if (!existsSync(srcPath)) return 0;
-  const remotas = readFileSync(srcPath, "utf8").split("\n").filter(Boolean).map(l => l.replaceAll("\\", "/"));
-  if (!existsSync(destPath)) {
-    writeFileSync(destPath, remotas.length ? remotas.join("\n") + "\n" : "");
-    return remotas.length;
-  }
-  const locales = new Set(readFileSync(destPath, "utf8").split("\n").filter(Boolean).map(l => l.replaceAll("\\", "/")));
-  const nuevas = remotas.filter((l) => !locales.has(l));
-  if (nuevas.length) {
-    const actual = readFileSync(destPath, "utf8");
-    const sep = actual === "" || actual.endsWith("\n") ? "" : "\n";
-    appendFileSync(destPath, sep + nuevas.join("\n") + "\n");
-  }
-  return nuevas.length;
+  return conBloqueoExclusivoSync(`${destPath}.lock`, () => {
+    // Lee y valida ambos documentos bajo el mismo lock antes de reemplazar el
+    // destino; un origen inválido no puede dejar un append parcial.
+    const remotas = leerLineasJsonl(srcPath);
+    const locales = leerLineasJsonl(destPath);
+    const vistas = new Set(locales);
+    const nuevas = [];
+    for (const linea of remotas) {
+      if (!vistas.has(linea)) {
+        vistas.add(linea);
+        nuevas.push(linea);
+      }
+    }
+    if (nuevas.length) escribirAtomicoSync(destPath, serializarLineasJsonl([...locales, ...nuevas]));
+    return nuevas.length;
+  });
 }
 
 export async function escanearSecretos(dirFabrica) {
@@ -136,13 +144,14 @@ export async function escanearSecretos(dirFabrica) {
   let encontrados = 0;
   for (const arch of archivos) {
     const ruta = join(dirFabrica, arch);
-    if (!existsSync(ruta)) continue;
-    const contenido = readFileSync(ruta, "utf8");
-    const resultado = redactar(contenido);
-    if (resultado.hallazgos.length > 0) {
-      writeFileSync(ruta, resultado.texto);
-      encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
-    }
+    encontrados += conBloqueoExclusivoSync(`${ruta}.lock`, () => {
+      if (!existsSync(ruta)) return 0;
+      const contenido = readFileSync(ruta, "utf8");
+      const resultado = redactar(contenido);
+      if (!resultado.hallazgos.length) return 0;
+      escribirAtomicoSync(ruta, resultado.texto);
+      return resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
+    });
   }
   return encontrados;
 }
