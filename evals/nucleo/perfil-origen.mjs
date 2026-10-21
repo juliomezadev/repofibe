@@ -46,6 +46,7 @@ async function iniciarDaemon(originOtro, originPerfil) {
     const entrada = readline.createInterface({ input: child.stdout });
     const mensajes = [];
     const esperas = [];
+    let siguienteMsg = 0;
     let stderr = "";
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => { stderr += chunk; });
@@ -71,7 +72,7 @@ async function iniciarDaemon(originOtro, originPerfil) {
       });
     };
     const enviar = async (accion, campos = {}) => {
-      const msgId = `sa03-${Date.now()}-${Math.random()}`;
+      const msgId = `sa03-${++siguienteMsg}`;
       const respuesta = esperar((m) => m.msgId === msgId);
       child.stdin.write(`${JSON.stringify({ accion, ...campos, msgId })}\n`);
       return respuesta;
