@@ -13,6 +13,7 @@ import {
   copyFileSync,
   unlinkSync,
   rmdirSync,
+  chmodSync,
   readdirSync,
   lstatSync,
   renameSync,
@@ -22,18 +23,96 @@ import { join, dirname, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { NOMBRE_MANIFIESTO, resolverManifiesto, verificarArchivos } from "./distribucion.mjs";
+import { diagnosticarInstalacion } from "./diagnostico.mjs";
 
 // Ejecuta sin shell. En Windows los CLIs de npm son shims .cmd.
 function ejecutar(cmd, args) {
   try {
-    execFileSync(cmd, args, { stdio: "pipe" });
+    return execFileSync(cmd, args, { stdio: "pipe", encoding: "utf8" });
   } catch (e) {
     if (process.platform === "win32" && (e.code === "ENOENT" || e.code === "EINVAL")) {
-      execFileSync(cmd + ".cmd", args, { stdio: "pipe" });
+      return execFileSync(cmd + ".cmd", args, { stdio: "pipe", encoding: "utf8" });
     } else {
       throw e;
     }
   }
+}
+
+function jsonFinal(salida) {
+  const ultima = String(salida).trim().split(/\r?\n/).at(-1);
+  try { return JSON.parse(ultima); }
+  catch { throw new Error("La CLI no devolvio JSON valido en la ultima linea"); }
+}
+
+function listarMarketplacesClaude() {
+  const lista = JSON.parse(ejecutar("claude", ["plugin", "marketplace", "list", "--json"]));
+  if (!Array.isArray(lista) || lista.some((m) => !m || typeof m.name !== "string" || typeof m.source !== "string")) {
+    throw new Error("la lista de marketplaces tiene un formato desconocido");
+  }
+  return lista;
+}
+
+function listarPluginsClaude() {
+  const lista = JSON.parse(ejecutar("claude", ["plugin", "list", "--json"]));
+  if (!Array.isArray(lista) || lista.some((p) => !p || typeof p.id !== "string")) {
+    throw new Error("la lista de plugins tiene un formato desconocido");
+  }
+  return lista;
+}
+
+const MARKETPLACE_REPOFIBE = "repofibe-marketplace";
+const PLUGIN_REPOFIBE = `repofibe@${MARKETPLACE_REPOFIBE}`;
+
+function rutaIgual(a, b) {
+  const normalizar = (ruta) => resolve(ruta).replace(/[\\/]+/g, sep).toLocaleLowerCase("en-US");
+  return typeof a === "string" && normalizar(a) === normalizar(b);
+}
+
+function marketplaceRepoFibe(marketplace) {
+  return marketplace?.name === MARKETPLACE_REPOFIBE && marketplace.source === "directory" &&
+    typeof marketplace.path === "string" && rutaIgual(marketplace.path, RAIZ);
+}
+
+function resultadoClaudeJson(salida, comando) {
+  const resultado = jsonFinal(salida);
+  if (!resultado || resultado.command !== comando || !["ok", "failed"].includes(resultado.outcome) || typeof resultado.message !== "string") {
+    throw new Error(`la respuesta JSON de ${comando} tiene un formato desconocido`);
+  }
+  return resultado;
+}
+
+function pluginsDeMarketplace(plugins, nombre) {
+  return plugins.filter((plugin) => plugin.id.endsWith(`@${nombre}`));
+}
+
+function compensarPluginClaude() {
+  let errorComando = null;
+  try {
+    const resultado = resultadoClaudeJson(ejecutar("claude", ["plugin", "uninstall", PLUGIN_REPOFIBE, "--scope", "user", "--json"]), "uninstall");
+    if (resultado.outcome !== "ok") errorComando = new Error(resultado.message);
+  } catch (e) {
+    errorComando = e;
+  }
+  const quedan = listarPluginsClaude().some((plugin) => plugin.id === PLUGIN_REPOFIBE && plugin.scope === "user");
+  if (quedan) throw new Error(`el plugin ${PLUGIN_REPOFIBE} sigue instalado en scope user${errorComando ? `: ${errorComando.message}` : ""}`);
+}
+
+function compensarMarketplaceClaude() {
+  const plugins = listarPluginsClaude();
+  const asociados = pluginsDeMarketplace(plugins, MARKETPLACE_REPOFIBE);
+  if (asociados.length) {
+    throw new Error(`se conserva ${MARKETPLACE_REPOFIBE}: quedan plugins instalados (${asociados.map((p) => p.id).join(", ")})`);
+  }
+  let errorComando = null;
+  try {
+    const resultado = resultadoClaudeJson(ejecutar("claude", ["plugin", "marketplace", "remove", MARKETPLACE_REPOFIBE, "--scope", "user", "--json"]), "marketplace-remove");
+    if (resultado.outcome !== "ok") errorComando = new Error(resultado.message);
+  } catch (e) {
+    errorComando = e;
+  }
+  const queda = listarMarketplacesClaude().some((marketplace) => marketplace.name === MARKETPLACE_REPOFIBE);
+  if (queda) throw new Error(`no se pudo confirmar la retirada del marketplace ${MARKETPLACE_REPOFIBE}${errorComando ? `: ${errorComando.message}` : ""}`);
 }
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -42,6 +121,9 @@ const APP = join(HOGAR, ".repofibe", "app");
 const REGISTRO = join(HOGAR, ".repofibe", "instalado.json");
 const MARCA_INICIO = "<!-- repofibe:inicio -->";
 const MARCA_FIN = "<!-- repofibe:fin -->";
+const LEGADO_ANTIVIRUS = 'node "C:/Users/mesw/Desktop/proyecto Repofibe 5/repofibe/hooks/antivirus-hook.mjs"';
+let manifiestoFuente = null;
+let transaccion = null;
 
 const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(n); return i >= 0 ? (args[i + 1] ?? true) : null; };
@@ -80,6 +162,173 @@ function hashArchivo(ruta) {
   return createHash("sha256").update(readFileSync(ruta)).digest("hex");
 }
 
+function directoriosPadreSeguros(ruta) {
+  let actual = dirname(resolve(ruta));
+  while (true) {
+    try {
+      const st = lstatSync(actual);
+      if (!st.isDirectory() || st.isSymbolicLink()) return false;
+    } catch {
+      return false;
+    }
+    const padre = dirname(actual);
+    if (padre === actual) return true;
+    actual = padre;
+  }
+}
+
+function archivoRegularSinEnlaces(ruta) {
+  try {
+    const st = lstatSync(ruta);
+    return st.isFile() && !st.isSymbolicLink() && directoriosPadreSeguros(ruta);
+  } catch {
+    return false;
+  }
+}
+
+function directorioSinEnlaces(ruta) {
+  try {
+    const st = lstatSync(ruta);
+    return st.isDirectory() && !st.isSymbolicLink() && directoriosPadreSeguros(ruta);
+  } catch {
+    return false;
+  }
+}
+
+function recordarAntesDeEscribir(ruta) {
+  if (!transaccion) return;
+  const absoluta = resolve(ruta);
+  const llave = claveRuta(absoluta);
+  if (transaccion.archivos.has(llave)) return;
+  try {
+    const st = lstatSync(absoluta);
+    if (!st.isFile() || st.isSymbolicLink()) throw new Error(`No se puede respaldar una ruta no regular: ${absoluta}`);
+    transaccion.archivos.set(llave, {
+      ruta: absoluta,
+      existe: true,
+      bytes: readFileSync(absoluta),
+      modo: st.mode & 0o777,
+      despues: null,
+      tocado: false,
+    });
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+    transaccion.archivos.set(llave, { ruta: absoluta, existe: false, bytes: null, modo: null, despues: null, tocado: false });
+  }
+}
+
+function registrarEscritura(ruta) {
+  if (!transaccion) return;
+  const item = transaccion.archivos.get(claveRuta(resolve(ruta)));
+  if (!item) return;
+  item.tocado = true;
+  item.despues = existe(ruta) ? hashArchivo(ruta) : null;
+}
+
+function revertirTransaccion() {
+  if (!transaccion) return;
+  for (const compensar of [...transaccion.compensaciones].reverse()) {
+    try { compensar(); }
+    catch (e) { console.warn(`  compensacion externa incompleta: ${e.message}`); }
+  }
+  for (const item of [...transaccion.archivos.values()].reverse()) {
+    if (!item.tocado) continue;
+    try {
+      const presente = existe(item.ruta);
+      if (presente && !archivoRegularSinEnlaces(item.ruta)) {
+        console.warn(`  rollback omitido: la ruta o uno de sus padres ya no es un archivo regular sin enlaces: ${item.ruta}`);
+        continue;
+      }
+      const actual = presente ? hashArchivo(item.ruta) : null;
+      if (actual !== item.despues) {
+        console.warn(`  rollback omitido por cambio concurrente: ${item.ruta}`);
+        continue;
+      }
+      if (!directoriosPadreSeguros(item.ruta)) {
+        console.warn(`  rollback omitido: directorio padre ausente o inseguro: ${item.ruta}`);
+        continue;
+      }
+      if (item.existe) {
+        const temporal = `${item.ruta}.tmp-rollback-${process.pid}`;
+        try {
+          if (!directoriosPadreSeguros(item.ruta)) throw new Error("directorio padre inseguro");
+          writeFileSync(temporal, item.bytes, { flag: "wx" });
+          chmodSync(temporal, item.modo);
+          if (!directoriosPadreSeguros(item.ruta)) throw new Error("directorio padre inseguro");
+          renameSync(temporal, item.ruta);
+        } finally {
+          try { if (archivoRegularSinEnlaces(temporal)) unlinkSync(temporal); } catch {}
+        }
+      } else if (actual !== null) {
+        if (!archivoRegularSinEnlaces(item.ruta) || hashArchivo(item.ruta) !== item.despues) {
+          console.warn(`  rollback omitido por cambio concurrente: ${item.ruta}`);
+          continue;
+        }
+        unlinkSync(item.ruta);
+      }
+    } catch (e) {
+      console.warn(`  rollback incompleto en ${item.ruta}: ${e.message}`);
+    }
+  }
+  for (const dir of [...transaccion.directorios].reverse()) {
+    try {
+      if (directorioSinEnlaces(dir) && readdirSync(dir).length === 0) rmdirSync(dir);
+      else if (existe(dir)) console.warn(`  rollback omitió directorio no vacío o inseguro: ${dir}`);
+    } catch {}
+  }
+}
+
+function ejecutarConRollback(fn) {
+  if (dryRun) return fn();
+  if (transaccion) return fn();
+  transaccion = { archivos: new Map(), directorios: [], compensaciones: [] };
+  try {
+    const marcador = join(HOGAR, ".repofibe", "en-actualizacion.json");
+    const directorioMarcador = dirname(marcador);
+    if (!existe(directorioMarcador)) {
+      const faltantes = [];
+      let actual = directorioMarcador;
+      while (!existe(actual)) {
+        faltantes.push(actual);
+        const padre = dirname(actual);
+        if (padre === actual) throw new Error(`No se pudo resolver el padre de ${actual}`);
+        actual = padre;
+      }
+      for (const dir of faltantes.reverse()) {
+        mkdirSync(dir);
+        transaccion.directorios.push(dir);
+      }
+    }
+    const manifiesto = obtenerManifiestoFuente();
+    recordarAntesDeEscribir(marcador);
+    writeFileSync(marcador, `${JSON.stringify({ version: manifiesto.version, commit: manifiesto.commit, iniciado: new Date().toISOString() })}\n`, "utf8");
+    registrarEscritura(marcador);
+    const resultado = fn();
+    unlinkSync(marcador);
+    registrarEscritura(marcador);
+    transaccion = null;
+    return resultado;
+  } catch (e) {
+    revertirTransaccion();
+    transaccion = null;
+    throw e;
+  }
+}
+
+function obtenerManifiestoFuente() {
+  if (manifiestoFuente) return manifiestoFuente;
+  const manifiesto = resolverManifiesto(RAIZ);
+  if (manifiesto.version !== readFileSync(join(RAIZ, "VERSION"), "utf8").trim()) {
+    throw new Error("La versión del checkout no coincide con el manifiesto de distribución");
+  }
+  const verificacion = verificarArchivos(RAIZ, manifiesto);
+  if (verificacion.faltantes.length || verificacion.modificados.length) {
+    throw new Error(`El checkout no coincide con su manifiesto: ${verificacion.faltantes.length} faltante(s), ${verificacion.modificados.length} modificado(s)`);
+  }
+  manifiestoFuente = manifiesto;
+  return manifiestoFuente;
+}
+
 function registroBase() {
   return {
     version: 2,
@@ -114,10 +363,23 @@ function leerRegistro() {
 }
 
 function guardarRegistro(registro) {
+  if (dryRun) {
+    console.log(`[DRY-RUN] write ${REGISTRO}`);
+    return;
+  }
   mkdirSync(dirname(REGISTRO), { recursive: true });
   const serializable = { ...registro };
   delete serializable._legacy;
-  writeFileSync(REGISTRO, JSON.stringify(serializable, null, 2) + "\n", "utf8");
+  const temporal = `${REGISTRO}.tmp-${process.pid}`;
+  recordarAntesDeEscribir(REGISTRO);
+  try {
+    writeFileSync(temporal, JSON.stringify(serializable, null, 2) + "\n", "utf8");
+    renameSync(temporal, REGISTRO);
+    registrarEscritura(REGISTRO);
+  } catch (e) {
+    try { unlinkSync(temporal); } catch {}
+    throw e;
+  }
 }
 
 function anotar(registro, ruta) {
@@ -156,6 +418,7 @@ function asegurarDirectorio(registro, ruta) {
   for (const dir of faltantes.reverse()) {
     if (!dryRun) mkdirSync(dir); else console.log("[DRY-RUN] mkdir", dir);
     anotarDirectorio(registro, dir);
+    if (!dryRun && transaccion) transaccion.directorios.push(dir);
   }
 }
 
@@ -224,7 +487,11 @@ function copiarArchivoSeguro(registro, origen, destino) {
     }
   }
 
-  if (!dryRun) copyFileSync(src, dst); else console.log("[DRY-RUN] copy", dst);
+  if (!dryRun) {
+    recordarAntesDeEscribir(dst);
+    copyFileSync(src, dst);
+    registrarEscritura(dst);
+  } else console.log("[DRY-RUN] copy", dst);
   registrarArchivo(registro, dst, hashArchivo(src));
   return true;
 }
@@ -251,7 +518,11 @@ function escribirArchivoSeguro(registro, destino, contenido) {
       return false;
     }
   }
-  if (!dryRun) writeFileSync(dst, contenido, "utf8"); else console.log("[DRY-RUN] write", dst);
+  if (!dryRun) {
+    recordarAntesDeEscribir(dst);
+    writeFileSync(dst, contenido, "utf8");
+    registrarEscritura(dst);
+  } else console.log("[DRY-RUN] write", dst);
   registrarArchivo(registro, dst, esperado);
   return true;
 }
@@ -267,19 +538,34 @@ function copiarArbol(registro, origen, destino) {
   }
 }
 
-// Copia el nucleo compartido a ~/.repofibe/app.
+// Copia exclusivamente el inventario certificado a ~/.repofibe/app.
 function instalarApp(registro) {
+  const manifiesto = obtenerManifiestoFuente();
   asegurarDirectorio(registro, APP);
-  for (const d of ["plantillas", "nucleo"]) copiarArbol(registro, join(RAIZ, d), join(APP, d));
-  for (const f of ["FILOSOFIA.md", "VERSION"]) copiarArchivoSeguro(registro, join(RAIZ, f), join(APP, f));
+  for (const archivo of manifiesto.archivos) {
+    copiarArchivoSeguro(registro, join(RAIZ, ...archivo.ruta.split("/")), join(APP, ...archivo.ruta.split("/")));
+  }
+  const serializado = `${JSON.stringify(manifiesto, null, 2)}\n`;
+  escribirArchivoSeguro(registro, join(APP, NOMBRE_MANIFIESTO), serializado);
   anotar(registro, APP);
+  registro.distribucion = { version: manifiesto.version, commit: manifiesto.commit };
+  guardarRegistro(registro);
+  if (dryRun) {
+    console.log(`  nucleo compartido -> ${APP} (dry-run; diagnostico omitido)`);
+    return;
+  }
+  const diagnostico = diagnosticarInstalacion({ raiz: APP, hogar: HOGAR, ignorarActualizacion: Boolean(transaccion) });
+  if (diagnostico.estado !== "coherente") {
+    throw new Error(`El diagnóstico posterior a la copia no pasó (${diagnostico.estado}); faltantes=${diagnostico.archivos.faltantes.join(",")}; modificados=${diagnostico.archivos.modificados.join(",")}; dependencias=${diagnostico.dependenciasInternasFaltantes.join(",")}; errores=${diagnostico.errores.join(",")}`);
+  }
   console.log(`  nucleo compartido -> ${APP}`);
 }
 
 function skills() {
-  return readdirSync(join(RAIZ, "skills"), { withFileTypes: true })
-    .filter((d) => d.isDirectory() && existe(join(RAIZ, "skills", d.name, "SKILL.md")))
-    .map((d) => d.name);
+  return obtenerManifiestoFuente().archivos
+    .map((f) => f.ruta.match(/^skills\/([^/]+)\/SKILL\.md$/)?.[1])
+    .filter(Boolean)
+    .sort();
 }
 
 // Reescribe el `name:` del frontmatter a `<prefijo><skill>` (p.ej.
@@ -296,9 +582,15 @@ function copiarSkills(registro, destinoBase, prefijo = "repofibe-") {
   const base = resolve(destinoBase);
   asegurarDirectorio(registro, base);
   anotarDestino(registro, base);
+  const manifiesto = obtenerManifiestoFuente();
   for (const s of skills()) {
     const destino = join(base, prefijo + s);
-    copiarArbol(registro, join(RAIZ, "skills", s), destino);
+    const prefijoFuente = `skills/${s}/`;
+    for (const archivo of manifiesto.archivos.filter((f) => f.ruta.startsWith(prefijoFuente))) {
+      const relativo = archivo.ruta.slice(prefijoFuente.length);
+      copiarArchivoSeguro(registro, join(RAIZ, "skills", s, ...relativo.split("/")), join(destino, ...relativo.split("/")));
+    }
+    asegurarDirectorio(registro, destino);
     // El SKILL.md se reescribe con el nombre prefijado (la copia de
     // copiarArbol trae el nombre corto; esto la sobrescribe con ownership
     // por hash del contenido transformado, así el refresco no la ve "editada").
@@ -343,7 +635,12 @@ function ponerBloque(registro, archivo, contenido) {
   let nuevo;
   if (actual) nuevo = texto.slice(0, actual.inicio) + bloque + texto.slice(actual.fin);
   else nuevo = texto.trimEnd() + (texto ? "\n\n" : "") + bloque + "\n";
-  if (dryRun) console.log("[DRY-RUN] write", destino); else writeFileSync(destino, nuevo, "utf8");
+  if (dryRun) console.log("[DRY-RUN] write", destino);
+  else {
+    recordarAntesDeEscribir(destino);
+    writeFileSync(destino, nuevo, "utf8");
+    registrarEscritura(destino);
+  }
   const instalado = extraerBloque(nuevo);
   registrarBloque(registro, destino, hashTexto(instalado.contenido), !existia);
   console.log(`  bloque de reglas -> ${destino}`);
@@ -379,7 +676,7 @@ function anotarPlugin(registro, nombre) {
 const RUTA_SETTINGS = join(HOGAR, ".claude", "settings.json");
 
 function entradasHook() {
-  const cmd = (archivo) => `node "${join(RAIZ, "hooks", archivo).replaceAll("\\", "/")}"`;
+  const cmd = (archivo) => `node "${join(APP, "hooks", archivo).replaceAll("\\", "/")}"`;
   return {
     PreToolUse: {
       archivo: "guardia.mjs",
@@ -398,7 +695,7 @@ function entradasHook() {
   };
 }
 
-function activarHooksClaude(registro) {
+function actualizarHooksClaude(registro, { activar = true, retirarPropios = false } = {}) {
   if (!existe(join(HOGAR, ".claude"))) {
     console.log("  hooks: no hay ~/.claude (Claude Code no detectado) - omitido");
     return false;
@@ -419,7 +716,43 @@ function activarHooksClaude(registro) {
   settings.hooks = settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {};
   let cambios = 0;
 
-  for (const [evento, { archivo, entrada }] of Object.entries(deseadas)) {
+  // F17: esta cadena identifica la única entrada experimental observada en
+  // la auditoría. No se elimina por basename ni por coincidencia parcial.
+  const postTool = Array.isArray(settings.hooks.PostToolUse) ? settings.hooks.PostToolUse : [];
+  const postToolNuevo = [];
+  for (const entrada of postTool) {
+    if (!Array.isArray(entrada?.hooks)) {
+      postToolNuevo.push(entrada);
+      continue;
+    }
+    const hooks = entrada.hooks.filter((h) => h?.command !== LEGADO_ANTIVIRUS);
+    const removidos = entrada.hooks.length - hooks.length;
+    if (removidos) {
+      cambios += removidos;
+      if (hooks.length) postToolNuevo.push({ ...entrada, hooks });
+    } else postToolNuevo.push(entrada);
+  }
+  if (cambios) settings.hooks.PostToolUse = postToolNuevo;
+
+  if (retirarPropios) {
+    for (const [evento, { entrada }] of Object.entries(deseadas)) {
+      const lista = Array.isArray(settings.hooks[evento]) ? settings.hooks[evento] : [];
+      const comandosPropios = new Set(entrada.hooks.map((h) => h.command));
+      const nueva = [];
+      for (const actual of lista) {
+        const hooks = Array.isArray(actual?.hooks) ? actual.hooks : [];
+        const conservados = hooks.filter((h) => !comandosPropios.has(h?.command));
+        const removidos = hooks.length - conservados.length;
+        if (removidos) {
+          cambios += removidos;
+          if (conservados.length) nueva.push({ ...actual, hooks: conservados });
+        } else nueva.push(actual);
+      }
+      if (nueva.length !== lista.length || nueva.some((e, i) => e !== lista[i])) settings.hooks[evento] = nueva;
+    }
+  }
+
+  if (activar) for (const [evento, { archivo, entrada }] of Object.entries(deseadas)) {
     const lista = Array.isArray(settings.hooks[evento]) ? settings.hooks[evento] : [];
     // Identidad por NOMBRE del hook, no por comando exacto: así una ruta que
     // cambió (repo movido) se actualiza en vez de duplicarse. Sin comillas en
@@ -455,17 +788,38 @@ function activarHooksClaude(registro) {
   // usuario, no la última versión ya modificada por repofibe.
   const respaldo = `${RUTA_SETTINGS}.bak-repofibe`;
   if (existia && !existe(respaldo)) {
+    recordarAntesDeEscribir(respaldo);
     writeFileSync(respaldo, readFileSync(RUTA_SETTINGS, "utf8"), "utf8");
+    registrarEscritura(respaldo);
     console.log(`  respaldo del original -> ${respaldo}`);
   }
-  const tmp = `${RUTA_SETTINGS}.tmp-repofibe`;
-  writeFileSync(tmp, serializado, "utf8");
-  renameSync(tmp, RUTA_SETTINGS); // atómico: nunca un settings.json a medias
+  const tmp = `${RUTA_SETTINGS}.tmp-repofibe-${process.pid}`;
+  recordarAntesDeEscribir(RUTA_SETTINGS);
+  try {
+    writeFileSync(tmp, serializado, { encoding: "utf8", flag: "wx" });
+    renameSync(tmp, RUTA_SETTINGS); // atómico: nunca un settings.json a medias
+  } catch (e) {
+    try { unlinkSync(tmp); } catch {}
+    throw e;
+  }
+  registrarEscritura(RUTA_SETTINGS);
 
   if (registro) registrarBloque(registro, RUTA_SETTINGS, hashTexto(serializado), !existia);
-  console.log(`  hooks deterministas ACTIVADOS en ${RUTA_SETTINGS} (${cambios} evento(s))`);
-  console.log("  reinicia Claude Code para que los cargue.");
+  console.log(`  configuración de hooks actualizada en ${RUTA_SETTINGS} (${cambios} cambio(s))`);
+  if (activar) console.log("  reinicia Claude Code para que cargue los hooks.");
   return true;
+}
+
+function activarHooksClaude(registro) {
+  return actualizarHooksClaude(registro, { activar: true });
+}
+
+function retirarHookExperimentalClaude(registro) {
+  return actualizarHooksClaude(registro, { activar: false });
+}
+
+function desactivarHooksClaude(registro) {
+  return actualizarHooksClaude(registro, { activar: false, retirarPropios: true });
 }
 
 // Desinstala solo archivos cuyo hash demuestra que siguen siendo la copia creada.
@@ -481,7 +835,11 @@ function quitarArchivoPropio(registro, propiedad) {
     console.warn(`  conservado archivo modificado por el usuario: ${ruta}`);
     return;
   }
-  if (!dryRun) unlinkSync(ruta); else console.log("[DRY-RUN] unlink", ruta);
+  if (!dryRun) {
+    recordarAntesDeEscribir(ruta);
+    unlinkSync(ruta);
+    registrarEscritura(ruta);
+  } else console.log("[DRY-RUN] unlink", ruta);
   console.log(`  eliminado: ${ruta}`);
 }
 
@@ -509,9 +867,17 @@ function quitarBloquePropio(propiedad) {
   if (antes) antes += texto.includes("\r\n") ? "\r\n" : "\n";
   const nuevo = antes + despues;
   if (propiedad.creado && nuevo.trim() === "") {
-    if (!dryRun) unlinkSync(ruta); else console.log("[DRY-RUN] unlink", ruta);
+    if (!dryRun) {
+      recordarAntesDeEscribir(ruta);
+      unlinkSync(ruta);
+      registrarEscritura(ruta);
+    } else console.log("[DRY-RUN] unlink", ruta);
   } else {
-    if (!dryRun) writeFileSync(ruta, nuevo, "utf8"); else console.log("[DRY-RUN] write", ruta);
+    if (!dryRun) {
+      recordarAntesDeEscribir(ruta);
+      writeFileSync(ruta, nuevo, "utf8");
+      registrarEscritura(ruta);
+    } else console.log("[DRY-RUN] write", ruta);
   }
   console.log(`  bloque removido de: ${ruta}`);
 }
@@ -542,20 +908,136 @@ const HOSTS = {
         // solo copiaba skills y volvia, de modo que una instalacion que cayo
         // al fallback de copia dejaba los guardias deterministas apagados en
         // silencio para siempre: ningun --refrescar los reintentaba ni avisaba.
+        if (!activarHooksClaude(registro)) throw new Error("No se pudieron activar los hooks de Claude Code");
+        return;
+      }
+      if (!retirarHookExperimentalClaude(registro)) {
+        throw new Error("No se pudo retirar de forma segura la entrada experimental auditada de Claude Code");
+      }
+      if (dryRun) {
+        console.log("  [DRY-RUN] registrar marketplace e instalar plugin; se simula fallback de skills");
+        copiarSkills(registro, join(HOGAR, ".claude", "skills"));
         activarHooksClaude(registro);
         return;
       }
+      let marketplacesAntes;
+      let pluginsAntes;
       try {
-        ejecutar("claude", ["plugin", "marketplace", "add", RAIZ]);
-        ejecutar("claude", ["plugin", "install", "repofibe@repofibe-marketplace"]);
-        anotarPlugin(registro, "repofibe");
-        console.log("  plugin nativo instalado (incluye hooks deterministas)");
+        marketplacesAntes = listarMarketplacesClaude();
+        pluginsAntes = listarPluginsClaude();
+      } catch (e) {
+        console.log(`  CLI de Claude sin JSON compatible o estado ilegible (${e.message}) - fallback a copia de skills`);
+        copiarSkills(registro, join(HOGAR, ".claude", "skills"));
+        if (!activarHooksClaude(registro)) throw new Error("No se pudieron activar los hooks de Claude Code");
         return;
-      } catch {
-        console.log("  CLI de claude no disponible u ocupada - fallback a copia de skills");
+      }
+
+      const coincidencias = marketplacesAntes.filter((marketplace) => marketplace.name === MARKETPLACE_REPOFIBE);
+      const marketplacePreexistente = coincidencias.length === 1 && marketplaceRepoFibe(coincidencias[0]);
+      const pluginPreexistente = pluginsAntes.some((plugin) => plugin.id === PLUGIN_REPOFIBE);
+      const conflictoMarketplace = coincidencias.length > 0 && !marketplacePreexistente;
+      if (conflictoMarketplace || (!coincidencias.length && pluginPreexistente)) {
+        console.log("  estado nativo de repofibe en conflicto; se conserva y se usa copia de skills");
+        copiarSkills(registro, join(HOGAR, ".claude", "skills"));
+        if (!activarHooksClaude(registro)) throw new Error("No se pudieron activar los hooks de Claude Code");
+        return;
+      }
+      if (marketplacePreexistente && pluginPreexistente) {
+        anotarPlugin(registro, "repofibe");
+        console.log("  marketplace y plugin preexistentes conservados; activacion no comprobada");
+        return;
+      }
+
+      let marketplaceCreado = false;
+      let compensarPluginRegistrado = false;
+      let compensarMarketplaceRegistrado = false;
+      const compensarPlugin = () => compensarPluginClaude();
+      const quitarCompensacion = (compensacion) => {
+        if (transaccion) transaccion.compensaciones = transaccion.compensaciones.filter((actual) => actual !== compensacion);
+      };
+      const compensarMarketplace = () => compensarMarketplaceClaude();
+      try {
+        if (!marketplacePreexistente) {
+          let respuestaAdd;
+          try {
+            respuestaAdd = resultadoClaudeJson(ejecutar("claude", ["plugin", "marketplace", "add", RAIZ, "--scope", "user", "--json"]), "marketplace-add");
+          } catch (e) {
+            let estadoPosterior;
+            try { estadoPosterior = listarMarketplacesClaude(); }
+            catch { throw new Error(`no se pudo determinar si marketplace add tuvo efecto: ${e.message}`); }
+            if (estadoPosterior.some((marketplace) => marketplaceRepoFibe(marketplace))) {
+              throw new Error(`marketplace add pudo tener efecto, pero no se pudo probar que esta ejecucion lo creo; se conserva: ${e.message}`);
+            }
+            throw e;
+          }
+          const addConfirmado = respuestaAdd.outcome === "ok" &&
+            respuestaAdd.message.startsWith(`Successfully added marketplace: ${MARKETPLACE_REPOFIBE}`) &&
+            (respuestaAdd.marketplace === undefined || respuestaAdd.marketplace === MARKETPLACE_REPOFIBE);
+          if (!addConfirmado) {
+            const estadoPosterior = listarMarketplacesClaude();
+            if (estadoPosterior.some((marketplace) => marketplaceRepoFibe(marketplace))) {
+              throw new Error("marketplace add no confirmo una creacion nueva; se conserva el estado por seguridad");
+            }
+            throw new Error(respuestaAdd.message || "marketplace add no confirmo el alta");
+          }
+          const estadoPosterior = listarMarketplacesClaude();
+          if (!estadoPosterior.some((marketplace) => marketplaceRepoFibe(marketplace))) {
+            throw new Error("marketplace add reporto exito, pero no aparece con el origen local esperado; no se intentara retirarlo");
+          }
+          marketplaceCreado = true;
+          if (transaccion) transaccion.compensaciones.push(compensarMarketplace);
+          compensarMarketplaceRegistrado = true;
+        }
+
+        if (transaccion) transaccion.compensaciones.push(compensarPlugin);
+        compensarPluginRegistrado = true;
+        const respuestaInstall = resultadoClaudeJson(ejecutar("claude", ["plugin", "install", PLUGIN_REPOFIBE, "--scope", "user", "--json"]), "install");
+        if (respuestaInstall.outcome !== "ok") throw new Error(respuestaInstall.message);
+        const pluginsDespues = listarPluginsClaude();
+        const pluginUserInstalado = pluginsDespues.some((plugin) => plugin.id === PLUGIN_REPOFIBE && plugin.scope === "user");
+        if (!pluginUserInstalado) {
+          if (/already installed/i.test(respuestaInstall.message) && pluginsDespues.some((plugin) => plugin.id === PLUGIN_REPOFIBE)) {
+            quitarCompensacion(compensarPlugin);
+            compensarPluginRegistrado = false;
+            anotarPlugin(registro, "repofibe");
+            console.log("  plugin nativo preexistente conservado; activacion no comprobada");
+            return;
+          }
+          throw new Error("plugin install no confirmo una instalacion en scope user");
+        }
+        anotarPlugin(registro, "repofibe");
+        console.log("  plugin nativo registrado (activacion no comprobada)");
+        return;
+      } catch (errorInstall) {
+        const erroresCompensacion = [];
+        if (compensarPluginRegistrado) {
+          try {
+            compensarPluginClaude();
+            quitarCompensacion(compensarPlugin);
+            compensarPluginRegistrado = false;
+          } catch (e) {
+            erroresCompensacion.push(`plugin uninstall: ${e.message}`);
+          }
+        }
+        if (marketplaceCreado && compensarMarketplaceRegistrado) {
+          try {
+            compensarMarketplaceClaude();
+            quitarCompensacion(compensarMarketplace);
+            compensarMarketplaceRegistrado = false;
+          } catch (e) {
+            erroresCompensacion.push(`marketplace remove: ${e.message}`);
+          }
+        }
+        if (erroresCompensacion.length) {
+          throw new Error(`No se pudieron compensar todos los cambios nativos de Claude: ${erroresCompensacion.join("; ")}; causa: ${errorInstall.message}`);
+        }
+        if (marketplaceCreado && compensarMarketplaceRegistrado) {
+          throw new Error(`el plugin fallo y no se pudo retirar de forma segura el marketplace creado; causa: ${errorInstall.message}`);
+        }
+        console.log(`  CLI de Claude no pudo completar la instalacion (${errorInstall.message}) - fallback a copia de skills`);
       }
       copiarSkills(registro, join(HOGAR, ".claude", "skills"));
-      activarHooksClaude(registro);
+      if (!activarHooksClaude(registro)) throw new Error("No se pudieron activar los hooks de Claude Code");
     },
   },
   antigravity: {
@@ -658,15 +1140,40 @@ if (refrescar) {
     console.log("Nada que refrescar: no hay instalacion previa registrada.");
     process.exit(0);
   }
+  let actualizarPluginNativo = false;
+  ejecutarConRollback(() => {
   instalarApp(registro);
   for (const base of bases) copiarSkills(registro, base);
+  if (existe(join(HOGAR, ".claude"))) {
+    if (registro.plugins.includes("repofibe")) {
+      if (!retirarHookExperimentalClaude(registro)) throw new Error("No se pudo migrar la configuracion experimental de Claude Code");
+      actualizarPluginNativo = true;
+    } else if (!activarHooksClaude(registro)) {
+      throw new Error("No se pudieron verificar y reactivar los hooks de Claude Code");
+    }
+  }
   guardarRegistro(registro);
+  if (dryRun) { console.log("[DRY-RUN] diagnostico posterior al refresco omitido"); return; }
+  const requiereClaude = existe(join(HOGAR, ".claude"));
+  const diagnostico = diagnosticarInstalacion({ raiz: APP, hogar: HOGAR, anfitrion: requiereClaude ? "claude" : null, ignorarActualizacion: Boolean(transaccion) });
+  if (diagnostico.estado !== "coherente") {
+    throw new Error(`El refresco no pasó el diagnóstico (${diagnostico.estado}); faltantes=${diagnostico.archivos.faltantes.join(",")}; modificados=${diagnostico.archivos.modificados.join(",")}`);
+  }
+  });
+  if (actualizarPluginNativo) {
+    if (dryRun) console.log("[DRY-RUN] claude plugin update repofibe");
+    else {
+      try { ejecutar("claude", ["plugin", "update", "repofibe"]); }
+      catch { throw new Error("La app local ya se refresco; no se pudo actualizar el plugin nativo con la CLI de Claude. Reintenta --refrescar"); }
+    }
+  }
   console.log(`Refresco completo en ${bases.length} destino(s).`);
   process.exit(0);
 }
 
 if (quitar) {
   const registro = leerRegistro();
+  if (existe(join(HOGAR, ".claude"))) desactivarHooksClaude(registro);
   for (const propiedad of registro.archivos) {
     try { quitarArchivoPropio(registro, propiedad); } catch (e) { console.warn(`  no se pudo quitar ${propiedad.ruta}: ${e.message}`); }
   }
@@ -701,16 +1208,39 @@ const registro = leerRegistro();
 // --hooks: solo activar los guardias deterministas, sin tocar skills.
 if (soloHooks) {
   console.log("Activando hooks deterministas de repofibe en Claude Code...");
+  ejecutarConRollback(() => {
+  instalarApp(registro);
   const ok = activarHooksClaude(registro);
   guardarRegistro(registro);
-  process.exit(ok ? 0 : 1);
+  if (dryRun) return;
+  const diagnostico = ok
+    ? diagnosticarInstalacion({ raiz: APP, hogar: HOGAR, anfitrion: "claude", ignorarActualizacion: Boolean(transaccion) })
+    : { estado: "incompleta" };
+  if (diagnostico.estado !== "coherente") {
+    console.error(`Diagnóstico final falló: ${diagnostico.estado}`);
+    throw new Error("Diagnostico final fallo");
+  }
+  });
+  process.exit(0);
 }
 
+ejecutarConRollback(() => {
 instalarApp(registro);
 for (const h of elegidos) {
   console.log(`\n[${h}]`);
   HOSTS[h].instalar(registro);
 }
 guardarRegistro(registro);
+if (dryRun) {
+  console.log("[DRY-RUN] diagnostico final omitido");
+} else {
+const anfitrionRequerido = elegidos.includes("claude") ? "claude" : null;
+const diagnostico = diagnosticarInstalacion({ raiz: APP, hogar: HOGAR, anfitrion: anfitrionRequerido, ignorarActualizacion: Boolean(transaccion) });
+if (diagnostico.estado !== "coherente") {
+  console.error(`Diagnóstico final falló: ${diagnostico.estado}; faltantes=${diagnostico.archivos.faltantes.join(",")}; modificados=${diagnostico.archivos.modificados.join(",")}`);
+  throw new Error("Diagnostico final fallo; revisar faltantes/modificados impresos arriba");
+}
+}
+});
 console.log(`\nListo. repofibe ${readFileSync(join(RAIZ, "VERSION"), "utf8").trim()} instalado en: ${elegidos.join(", ")}.`);
 console.log("Actualizar = volver a ejecutar este instalador. Desinstalar = --quitar.");
