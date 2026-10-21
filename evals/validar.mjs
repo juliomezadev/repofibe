@@ -320,6 +320,9 @@ await ejecutarPrueba("evals/seguridad/instalacion-segura.mjs", "Seguridad Instal
 await ejecutarPrueba("evals/seguridad/instalacion-hosts.mjs", "Seguridad Hosts Principales");
 await ejecutarPrueba("evals/seguridad/hooks-activados.mjs", "Hooks Deterministas Activables");
 await ejecutarPrueba("evals/seguridad/guardia.mjs", "Guardia (probado por evasión)");
+await ejecutarPrueba("evals/seguridad/guardia-configuracion.mjs", "Configuración de guardias");
+await ejecutarPrueba("evals/seguridad/congelamiento-estricto.mjs", "Congelamiento estricto");
+await ejecutarPrueba("evals/seguridad/auth-rutas.mjs", "Confinamiento de perfiles de autenticación");
 await ejecutarPrueba("evals/seguridad/instalacion-hosts-secundarios.mjs", "Seguridad Hosts Secundarios");
 await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
@@ -328,17 +331,24 @@ await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
 await ejecutarPrueba("evals/seguridad/memoria-confianza.mjs", "Frontera de confianza de memoria");
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
+await ejecutarPrueba("evals/nucleo/auth-cierre-prematuro.mjs", "Cancelación de captura de autenticación");
+await ejecutarPrueba("evals/nucleo/autenticacion-captura.mjs", "Captura autenticada");
+await ejecutarPrueba("evals/nucleo/perfil-origen.mjs", "Perfil por origen y contexto dinámico");
 await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
 await ejecutarPrueba("evals/nucleo/grafo-frescura.mjs", "Frescura del grafo");
 await ejecutarPrueba("evals/nucleo/estado-schema.mjs", "Esquema persistido del estado");
+await ejecutarPrueba("evals/nucleo/estado-concurrencia.mjs", "Transacciones de estado concurrentes");
 await ejecutarPrueba("evals/nucleo/dependencias.mjs", "Dependencias reproducibles");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
 await ejecutarPrueba("evals/nucleo/qaonline-persistencia.mjs", "QA en Vivo (sesión persistente)");
+await ejecutarPrueba("evals/nucleo/qaonline-autenticacion.mjs", "QA en Vivo (autenticación validada)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
 await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
 await ejecutarPrueba("evals/nucleo/sync-auth.mjs", "Sync (auth local)");
 await ejecutarPrueba("evals/nucleo/sync-pull.mjs", "Sync pull (errores reales)");
+await ejecutarPrueba("evals/nucleo/sync-rutas.mjs", "Integridad de rutas JSONL");
+await ejecutarPrueba("evals/nucleo/sync-memoria-concurrente.mjs", "Memoria concurrente con sync");
 await ejecutarPrueba("evals/seguridad/veredicto.mjs", "Veredicto de evals");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
