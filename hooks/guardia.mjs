@@ -12,8 +12,8 @@
 // Diseño: fail-open. Cualquier error interno → exit 0 sin salida. Un hook de
 // seguridad jamás debe romper la sesión del usuario.
 
-import { readFileSync, existsSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { readFileSync, lstatSync, realpathSync, statSync } from "node:fs";
+import { join, resolve, sep, parse, relative, isAbsolute } from "node:path";
 
 // Telemetría local: este hook ya corre en cada uso de herramienta, así que es
 // el sensor natural de "qué se usa" sin pagar el arranque de otro proceso.
@@ -26,8 +26,190 @@ try { ({ registrar } = await import("../nucleo/traza.mjs")); } catch {}
 let analizarGitPush = () => ({ requiereProteccion: false });
 try { ({ analizarGitPush } = await import("../nucleo/politica-riesgo.mjs")); } catch {}
 
-function leerJson(ruta) {
-  try { return JSON.parse(readFileSync(ruta, "utf8")); } catch { return null; }
+function compararRuta(ruta) {
+  const absoluta = resolve(ruta);
+  return process.platform === "win32" ? absoluta.toLowerCase() : absoluta;
+}
+
+function mismaRuta(a, b) {
+  return compararRuta(a) === compararRuta(b);
+}
+
+function dentroDe(ruta, base) {
+  const objetivo = compararRuta(ruta);
+  const limite = compararRuta(base);
+  const relativa = relative(limite, objetivo);
+  return relativa === "" || (relativa !== ".." && !relativa.startsWith(`..${sep}`) && !isAbsolute(relativa));
+}
+
+// Devuelve la ruta fisica normalizada y detecta enlaces en todos sus
+// componentes. Con permitirEnlaces=false, cualquier enlace invalida la ruta.
+function inspeccionarRuta(ruta, permitirEnlaces = false) {
+  try {
+    const absoluta = resolve(String(ruta));
+    const raiz = parse(absoluta).root;
+    const partes = absoluta.slice(raiz.length).split(sep).filter(Boolean);
+    let cursor = raiz;
+    let tieneEnlace = false;
+
+    for (let i = 0; i < partes.length; i += 1) {
+      const siguiente = join(cursor, partes[i]);
+      let info;
+      try {
+        info = lstatSync(siguiente);
+      } catch (error) {
+        if (error.code === "ENOENT" || error.code === "ENOTDIR") {
+          return {
+            ok: true,
+            existe: false,
+            esDirectorio: false,
+            tieneEnlace,
+            ruta: resolve(cursor, ...partes.slice(i)),
+          };
+        }
+        return { ok: false, razon: "no se pudo inspeccionar la ruta" };
+      }
+
+      if (info.isSymbolicLink()) {
+        tieneEnlace = true;
+        if (!permitirEnlaces) return { ok: false, razon: "la ruta contiene un enlace" };
+        cursor = realpathSync.native(siguiente);
+        if (i < partes.length - 1 && !statSync(cursor).isDirectory()) {
+          return { ok: false, razon: "un componente de la ruta no es directorio" };
+        }
+      } else {
+        if (i < partes.length - 1 && !info.isDirectory()) {
+          return { ok: false, razon: "un componente de la ruta no es directorio" };
+        }
+        cursor = siguiente;
+      }
+    }
+
+    const rutaFisica = partes.length ? realpathSync.native(cursor) : cursor;
+    const informacionFinal = statSync(rutaFisica);
+    return { ok: true, existe: true, esDirectorio: informacionFinal.isDirectory(), tieneEnlace, ruta: rutaFisica };
+  } catch {
+    return { ok: false, razon: "no se pudo resolver la ruta" };
+  }
+}
+
+function rutaOperativa(objetivo, cwd, nombre) {
+  const esperada = resolve(cwd, ".fabrica", nombre);
+  const propuesta = resolve(objetivo);
+  const inspeccionEsperada = inspeccionarRuta(esperada);
+  const inspeccionPropuesta = inspeccionarRuta(propuesta);
+  if (mismaRuta(esperada, propuesta) && inspeccionEsperada.ok && inspeccionPropuesta.ok) return "exacta";
+
+  // Una ruta alterna que llega al archivo operativo mediante un enlace no
+  // hereda la excepcion. Se marca para denegarla, no como una edicion comun.
+  const esperadaFisica = inspeccionarRuta(esperada, true);
+  const propuestaFisica = inspeccionarRuta(propuesta, true);
+  if (esperadaFisica.ok && propuestaFisica.ok && mismaRuta(esperadaFisica.ruta, propuestaFisica.ruta)) return "enlace";
+  return null;
+}
+
+function leerArchivoSeguro(ruta) {
+  const inspeccion = inspeccionarRuta(ruta);
+  if (!inspeccion.ok) return { estado: "invalido" };
+  if (!inspeccion.existe) return { estado: "ausente", texto: "" };
+  try { return { estado: "valido", texto: readFileSync(inspeccion.ruta, "utf8") }; }
+  catch { return { estado: "invalido" }; }
+}
+
+function leerObjetoSeguro(ruta) {
+  const archivo = leerArchivoSeguro(ruta);
+  if (archivo.estado === "ausente") return archivo;
+  if (archivo.estado !== "valido") return { estado: "invalido" };
+  try {
+    const objeto = JSON.parse(archivo.texto);
+    if (!objeto || typeof objeto !== "object" || Array.isArray(objeto)) return { estado: "invalido" };
+    return { estado: "valido", objeto, texto: archivo.texto };
+  } catch {
+    return { estado: "invalido" };
+  }
+}
+
+function leerGuardia(cwd) {
+  const leido = leerObjetoSeguro(join(cwd, ".fabrica", "guardia.json"));
+  if (leido.estado === "ausente") return { activo: true, valido: true };
+  if (leido.estado !== "valido") return { activo: true, valido: false };
+  if (Object.hasOwn(leido.objeto, "activo") && typeof leido.objeto.activo !== "boolean") {
+    return { activo: true, valido: false };
+  }
+  return { activo: leido.objeto.activo !== false, valido: true };
+}
+
+function estadoCongelamiento(objeto, cwd) {
+  const directorio = objeto?.directorio;
+  if (directorio === undefined || directorio === null || directorio === "") return { estado: "ausente" };
+  if (typeof directorio !== "string" || !directorio.trim()) return { estado: "invalido" };
+  const rutaConfigurada = resolve(cwd, directorio);
+  const inspeccion = inspeccionarRuta(rutaConfigurada);
+  if (!inspeccion.ok || !inspeccion.existe || !inspeccion.esDirectorio) return { estado: "invalido" };
+  return { estado: "activo", ruta: inspeccion.ruta, directorio };
+}
+
+function leerCongelamiento(cwd) {
+  const leido = leerObjetoSeguro(join(cwd, ".fabrica", "congelar.json"));
+  if (leido.estado === "ausente") return { estado: "ausente" };
+  if (leido.estado !== "valido") return { estado: "invalido" };
+  return estadoCongelamiento(leido.objeto, cwd);
+}
+
+function jsonEfectivo(texto) {
+  try {
+    const valor = JSON.parse(texto);
+    return valor && typeof valor === "object" && !Array.isArray(valor) ? valor : null;
+  } catch { return null; }
+}
+
+function reemplazarEdicion(texto, edicion) {
+  if (typeof edicion?.old_string !== "string" || typeof edicion?.new_string !== "string") return null;
+  if (edicion.old_string.length === 0) return null;
+  const cantidad = texto.split(edicion.old_string).length - 1;
+  if (edicion.replace_all === true) return texto.split(edicion.old_string).join(edicion.new_string);
+  if (cantidad !== 1) return null;
+  return texto.replace(edicion.old_string, edicion.new_string);
+}
+
+function contenidoPropuesto(objetivo, tool, input) {
+  if (tool === "Write") {
+    if (typeof input.content === "string") return input.content;
+    if (typeof input.new_string === "string") return input.new_string;
+    return null;
+  }
+  const actual = leerArchivoSeguro(objetivo);
+  if (actual.estado !== "valido") return null;
+  let texto = actual.texto;
+  if (tool === "Edit") return reemplazarEdicion(texto, input);
+  if (tool === "MultiEdit") {
+    if (!Array.isArray(input.edits) || input.edits.length === 0) return null;
+    for (const edicion of input.edits) {
+      texto = reemplazarEdicion(texto, edicion);
+      if (texto === null) return null;
+    }
+    return texto;
+  }
+  return null;
+}
+
+function cambioReduceGuardia(cwd, contenido) {
+  const nuevo = jsonEfectivo(contenido);
+  if (!nuevo) return true;
+  const anterior = leerGuardia(cwd);
+  const nuevoActivo = nuevo.activo !== false;
+  return anterior.activo && !nuevoActivo;
+}
+
+function cambioReduceCongelamiento(cwd, contenido, anterior) {
+  const nuevoObjeto = jsonEfectivo(contenido);
+  if (!nuevoObjeto) return true;
+  const nuevo = estadoCongelamiento(nuevoObjeto, cwd);
+  if (anterior.estado === "invalido" || nuevo.estado === "invalido") return true;
+  if (anterior.estado === "ausente") return false;
+  if (nuevo.estado === "ausente") return true;
+  // El conjunto de escrituras nuevas debe estar contenido en el anterior.
+  return !dentroDe(nuevo.ruta, anterior.ruta);
 }
 
 // Contexto de lo que se va a registrar. SOLO metadatos: nombre de herramienta
@@ -102,67 +284,78 @@ try {
 
   // ── Protección 2: congelamiento de directorio ─────────────────────────────
   if (["Edit", "Write", "MultiEdit", "NotebookEdit"].includes(tool)) {
-    const objetivo = resolve(input.file_path ?? input.notebook_path ?? "");
+    const objetivo = resolve(cwd, input.file_path ?? input.notebook_path ?? "");
+    const rutaGuardia = rutaOperativa(objetivo, cwd, "guardia.json");
+    const rutaCongelar = rutaOperativa(objetivo, cwd, "congelar.json");
+    const congelamiento = leerCongelamiento(cwd);
 
-    // Configuración del propio guardia. Antes esto era un `deny` absoluto, y
-    // eso dejaba MUERTA a la skill /guardian: sus cuatro comandos ("guardián
-    // on/off", "congela a <dir>", "descongela") consisten precisamente en
-    // escribir estos archivos. El bug estuvo invisible mientras los hooks no
-    // corrían; al activarlos quedó a la vista.
-    //
-    // El criterio correcto no es "el agente nunca toca esto", es **asimetría
-    // por dirección**: encender el guardia o congelar deja al usuario MÁS
-    // protegido y no necesita fricción; apagarlo o descongelar lo deja menos
-    // protegido y exige su aprobación explícita. `ask` se la pide — que es lo
-    // que el `deny` pretendía lograr, pero sin romper la skill. Un `deny` que
-    // obliga al usuario a editar JSON a mano termina en usuarios que no
-    // configuran nada, o que apagan la protección por otra vía.
-    if (objetivo.endsWith("guardia.json") || objetivo.endsWith("congelar.json")) {
-      const contenido = String(input.content ?? input.new_string ?? "");
-      const apagaGuardia = /"activo"\s*:\s*false/i.test(contenido);
-      const descongela = objetivo.endsWith("congelar.json") && !/"directorio"\s*:\s*"[^"]+"/i.test(contenido);
-      // Sin contenido visible (p.ej. un Edit parcial) no se puede saber la
-      // dirección del cambio: ante la duda, se pregunta.
-      const direccionDesconocida = contenido.trim() === "";
+    if (rutaGuardia === "enlace" || rutaCongelar === "enlace") {
+      responder("deny", "GUARDIA repofibe: los archivos operativos solo se modifican por su ruta exacta, sin enlaces ni alias.");
+    }
 
-      if (apagaGuardia || descongela || direccionDesconocida) {
-        responder("ask",
-          `GUARDIA repofibe: se va a REDUCIR tu protección (${objetivo.endsWith("guardia.json") ? "apagar el guardia de comandos destructivos" : "levantar el congelamiento de directorio"}). ` +
-          `Confírmalo tú: el agente no puede reducirla por su cuenta.`);
+    if (congelamiento.estado === "invalido" && rutaCongelar !== "exacta") {
+      responder("deny", "GUARDIA repofibe: la politica de congelamiento no se puede validar. Repara .fabrica/congelar.json antes de editar.");
+    }
+
+    if (rutaGuardia === "exacta" || rutaCongelar === "exacta") {
+      const esGuardia = rutaGuardia === "exacta";
+      if (congelamiento.estado === "invalido" && esGuardia) {
+        responder("deny", "GUARDIA repofibe: repara primero la politica de congelamiento invalida.");
       }
-      // Encender el guardia o congelar un directorio: dirección segura, pasa
-      // sin fricción y queda registrado en la traza igual que todo lo demás.
+      const propuesto = contenidoPropuesto(objetivo, tool, input);
+      if (propuesto === null) {
+        responder("ask", "GUARDIA repofibe: no se pudo determinar el estado completo tras esta edicion. Confirma el cambio de proteccion.");
+      }
+      const reduce = esGuardia
+        ? cambioReduceGuardia(cwd, propuesto)
+        : cambioReduceCongelamiento(cwd, propuesto, congelamiento);
+      if (reduce) {
+        responder("ask",
+          "GUARDIA repofibe: esta edicion reduce o no permite verificar la proteccion (" +
+          (esGuardia ? "guardia de comandos" : "congelamiento de ediciones") +
+          "). Confirma el cambio; el agente no puede reducirla por su cuenta.");
+      }
       salir("permitir");
     }
 
-    const congelar = leerJson(join(cwd, ".fabrica", "congelar.json"));
-    if (congelar?.directorio) {
-      const permitido = resolve(cwd, congelar.directorio);
-      const fabrica = resolve(cwd, ".fabrica");
-      const dentro = (base) => objetivo === base || objetivo.startsWith(base + sep);
-      if (objetivo && !dentro(permitido) && !dentro(fabrica)) {
+    if (congelamiento.estado === "activo") {
+      const inspeccionObjetivo = inspeccionarRuta(objetivo, true);
+      if (!inspeccionObjetivo.ok || !dentroDe(inspeccionObjetivo.ruta, congelamiento.ruta)) {
         responder("deny",
-          `Ediciones congeladas a "${congelar.directorio}" (activado con /guardian congelar). ` +
-          `El archivo ${objetivo} está fuera del límite. Descongela con /guardian descongelar si es intencional.`);
+          "Ediciones congeladas a " + JSON.stringify(congelamiento.directorio) +
+          ". La ruta resuelta del archivo esta fuera del limite.");
       }
     }
-    salir("permitir"); // edición permitida, sin opinión
+    if (congelamiento.estado === "invalido") {
+      responder("deny", "GUARDIA repofibe: politica de congelamiento invalida; no se puede comprobar el limite de esta edicion.");
+    }
+    salir("permitir");
   }
 
-  // ── Protección 1: comandos destructivos ───────────────────────────────────
   if (tool === "Bash" || tool === "PowerShell") {
-    const config = leerJson(join(cwd, ".fabrica", "guardia.json"));
-    if (config && config.activo === false) process.exit(0); // guardia apagada explícitamente
+    const congelamiento = leerCongelamiento(cwd);
+    if (congelamiento.estado === "activo") {
+      responder("deny", "GUARDIA repofibe: Bash y PowerShell quedan bloqueados mientras el congelamiento esta activo. Levanta el congelamiento explicitamente para ejecutar shell.");
+    }
+    if (congelamiento.estado === "invalido") {
+      responder("deny", "GUARDIA repofibe: la politica de congelamiento es invalida; Bash y PowerShell quedan bloqueados hasta repararla.");
+    }
+
+    const guardia = leerGuardia(cwd);
+    if (!guardia.valido) {
+      responder("deny", "GUARDIA repofibe: guardia.json es invalido; Bash y PowerShell quedan bloqueados hasta repararlo.");
+    }
+    if (!guardia.activo) process.exit(0);
     const comando = String(input.command ?? "");
     const push = analizarGitPush(comando);
     if (push.requiereProteccion) {
-      responder("ask", "GUARDIA repofibe: git push incluye --force/-f. Confirma que el push forzado es intencional antes de ejecutarlo.");
+      responder("ask", "GUARDIA repofibe: git push incluye una actualizacion forzada (--force/-f o refspec +). Confirma que es intencional antes de ejecutarlo.");
     }
     for (const [patron, descripcion] of DESTRUCTIVOS) {
       if (patron.test(comando)) {
         responder("ask",
-          `GUARDIA repofibe: el comando contiene "${descripcion}". ` +
-          `Confirma que es intencional antes de ejecutarlo. (Desactivar: /guardian off)`);
+          "GUARDIA repofibe: el comando contiene \"" + descripcion + "\". " +
+          "Confirma que es intencional antes de ejecutarlo. (Desactivar: /guardian off)");
       }
     }
   }

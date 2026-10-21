@@ -19,7 +19,7 @@
 //   - **Que no estorbe.** Un guardia que alerta en lo cotidiano se apaga a la
 //     semana, y entonces protege cero.
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -65,6 +65,11 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
     ["git push --force origin main", "push forzado"],
     ["git push -f origin main", "push forzado con flag corto"],
     ["git push --force --force-with-lease origin main", "force combinado con lease"],
+    ["git push origin feature && git push --force origin main", "push normal seguido de push forzado"],
+    ["git -C 'C:\\repo con espacios' push -f origin main", "opción global -C con ruta con espacios"],
+    ["git -c core.pager=cat --no-pager push origin main --force", "opciones globales antes del subcomando"],
+    ["git --git-dir='C:\\repo con espacios\\.git' push origin +main:main", "git-dir y refspec forzado"],
+    ["git push origin +refs/heads/main:refs/heads/main", "refspec con actualización forzada"],
     ["git push --force-with-lease --force origin main", "force combinado despuÃ©s de lease"],
     ["git clean -fd", "borra no versionados"],
     ["DROP TABLE usuarios", "SQL destructivo"],
@@ -85,6 +90,9 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
     "git checkout -- src/app.js", "git checkout main", "git restore src/app.js",
     "git stash", "git stash pop", "git commit -m 'x'", "git pull",
     "git push --force-with-lease origin main",
+    "git push origin feature && git push origin main",
+    "git push origin main --push-option +metadata",
+    "git push -o --force origin main",
     "npm test", "npm install", "node evals/validar.mjs",
     "find . -name '*.js'", "chmod 644 archivo", "ls -la",
   ];
@@ -102,6 +110,8 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
   const guardiaJson = join(casa, ".fabrica", "guardia.json");
   const congelarJson = join(casa, ".fabrica", "congelar.json");
 
+  mkdirSync(join(casa, ".fabrica"), { recursive: true });
+  mkdirSync(join(casa, "src"), { recursive: true });
   const encender = porEscritura(guardiaJson, '{"activo": true}');
   const congelar = porEscritura(congelarJson, '{"directorio": "src"}');
   if (encender === "deny" || congelar === "deny") {
@@ -116,6 +126,10 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
 {
   const guardiaJson = join(casa, ".fabrica", "guardia.json");
   const congelarJson = join(casa, ".fabrica", "congelar.json");
+
+  mkdirSync(join(casa, ".fabrica"), { recursive: true });
+  mkdirSync(join(casa, "src"), { recursive: true });
+  writeFileSync(congelarJson, '{"directorio":"src"}', "utf8");
 
   const apagar = porEscritura(guardiaJson, '{"activo": false}');
   const descongelar = porEscritura(congelarJson, "{}");

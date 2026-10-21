@@ -27,6 +27,35 @@ Lee y reporta:
 - `.fabrica/congelar.json` → `{"directorio": "src"}` = ediciones limitadas a
   ese directorio. Sin archivo = sin congelamiento.
 
+### Garantía del hook en Claude Code
+
+- El hook reconoce únicamente las rutas exactas `.fabrica/guardia.json` y
+  `.fabrica/congelar.json` bajo la raíz activa. Un archivo con el mismo nombre
+  en otra carpeta, una ruta que pase por un enlace simbólico o una configuración
+  que no se pueda leer no recibe esa excepción.
+- Con congelamiento válido, Edit/Write solo permite rutas reales dentro del
+  directorio indicado y las dos rutas operativas exactas. Bash y PowerShell se
+  deniegan completos; el hook no intenta decidir por regex si un comando es
+  seguro. Las herramientas de lectura dedicadas siguen disponibles.
+- Un archivo de congelamiento invalido tambien bloquea Bash, PowerShell y las
+  ediciones cuyo limite no se pueda comprobar. Si la ruta es un archivo regular,
+  se puede reparar escribiendo `.fabrica/congelar.json` con Edit/Write; el hook
+  pide confirmacion cuando no puede demostrar que la proteccion se mantiene o
+  aumenta.
+- Si `guardia.json` es invalido, Bash y PowerShell se bloquean hasta repararlo
+  con Edit/Write por la ruta exacta. La telemetria no cambia estas decisiones
+  de politica.
+- Si `.fabrica` o el archivo de congelamiento es un enlace, el hook deniega esa
+  ruta y sus alias. El usuario debe corregir el enlace desde una herramienta
+  externa que no pase por el hook; el shell de la sesion congelada sigue bloqueado.
+- Para levantar un congelamiento activo, reemplaza su contenido por `{}` con
+  Edit/Write y confirma el `ask` del hook. Después se habilitan de nuevo los
+  comandos de shell. No intentes borrarlo con Bash mientras siga activo.
+
+El hook de Claude Code da una decisión determinista solo para las herramientas
+que intercepta. En hosts sin este hook, incluidas las integraciones que dependen
+de instrucciones, la garantía es más débil y no equivale a un sandbox.
+
 ## Operaciones
 
 | El usuario dice | Haz |
@@ -34,7 +63,7 @@ Lee y reporta:
 | "ten cuidado" / "guardián on" | Escribe `.fabrica/guardia.json` con `{"activo": true}` y confirma qué patrones vigila (rm -rf, reset --hard, push --force, DROP TABLE, format...) |
 | "guardián off" | Escribe `{"activo": false}`. Advierte una línea de qué pierde |
 | "congela a <dir>" | Verifica que el directorio existe; escribe `.fabrica/congelar.json` con `{"directorio": "<dir>"}`. Desde ya, toda edición fuera se DENIEGA (en Claude Code) |
-| "descongela" | Borra `.fabrica/congelar.json` y confirma |
+| "descongela" | Reemplaza el contenido exacto de `.fabrica/congelar.json` por `{}` con Edit/Write y confirma la solicitud del hook. |
 | "modo máximo" / "guard" | Ambas: guardia on + congela al directorio que el usuario indique |
 
 ## Reglas para el agente (todos los hosts)
