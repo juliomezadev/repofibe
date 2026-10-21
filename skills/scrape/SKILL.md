@@ -31,6 +31,11 @@ regístralo (paso 4) para que se acerquen a activa.
 
 ## Fase 2 — Navega y mapea
 
+Para extraer contenido detrás de login, usa `/autenticar` y carga `perfil` con
+la URL completa de destino (incluidos esquema y puerto). El contexto se recrea
+al cargar el perfil; toma un `snapshot` nuevo antes de usar refs y no asumas
+que localStorage se comparte entre puertos.
+
 ```
 node <RAIZ>/nucleo/navegador.mjs ejecutar '[
   {"accion":"navegar","url":"<url>"},

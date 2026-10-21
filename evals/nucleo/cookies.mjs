@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
-import { normalizarDominio, cargar, listar, retirar, dirAuth } from "../../nucleo/cookies.mjs";
+import { normalizarDominio, cargar, listar, retirar, dirAuth, guardarEstado } from "../../nucleo/cookies.mjs";
 import { ejecutarScript } from "../../nucleo/navegador.mjs";
 
 const TEMP = mkdtempSync(join(tmpdir(), "repofibe-cookies-eval-"));
@@ -78,11 +78,11 @@ async function probarPerfilSiHayPlaywright() {
     origins: [],
   };
   dirAuth(TEMP);
-  writeFileSync(join(dirAuth(TEMP), "127.0.0.1.json"), JSON.stringify(state));
+  guardarEstado(url, state, TEMP);
 
   // Ejecutar script con acción perfil + navegar + snapshot
   const resultados = await ejecutarScript([
-    { accion: "perfil", dominio: "127.0.0.1" },
+    { accion: "perfil", dominio: url },
     { accion: "navegar", url },
     { accion: "snapshot" },
   ], { headless: true, dirBase: TEMP, timeoutMs: 10000 });

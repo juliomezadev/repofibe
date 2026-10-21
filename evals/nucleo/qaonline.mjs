@@ -55,7 +55,7 @@ async function main() {
     // 2. Ejecutar QA en Vivo con macro de Self-Healing Auth
     const res = await ejecutarQAOnline({
       flujo: "Test Dashboard Mock",
-      dominio: "127.0.0.1",
+      dominio: baseUrl,
       script: [
         { accion: "navegar", url: `${baseUrl}/dashboard` },
         { accion: "snapshot" }
@@ -65,7 +65,8 @@ async function main() {
         { accion: "navegar", url: `${baseUrl}/login` },
         { accion: "snapshot" },
         { accion: "click", ref: "e2" }
-      ]
+      ],
+      postcondicionAutenticada: { url: `${baseUrl}/dashboard`, selector: "h1" },
     });
 
     if (!res.ok) {

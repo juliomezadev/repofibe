@@ -23,6 +23,11 @@ dice — propón `npm ci && npm run setup:chromium`.
 
 ## Fase 1 — Objetivo y evidencia inicial
 
+Si la vista requiere login, usa `/autenticar` y carga `perfil` con la URL
+completa (esquema, hostname y puerto) antes de navegar. Al recrearse el
+contexto, las refs anteriores dejan de servir: captura un `snapshot` nuevo.
+localStorage se aplica solo al origen exacto.
+
 1. Detecta la URL: `.fabrica/deploy.json` → `url_produccion`, o pregunta al
    usuario (RECOMENDACIÓN: `http://localhost:<puerto del dev server>` si
    hay uno corriendo — revisa `package.json` scripts o pregunta).

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Regresión Batch 2: una corrida QA debe conservar navegador, contexto, page
 // y refs entre acciones, incluida la recuperación de autenticación.
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
@@ -118,18 +118,18 @@ async function main() {
       await primera.ejecutar({ accion: "navegar", url: `${baseUrl}/auth-set` });
       const exportado = await primera.ejecutar({ accion: "exportarPerfil" });
       assert.equal(exportado.ok, true);
-      guardarEstado("127.0.0.1", exportado.state, TEMP);
+      guardarEstado(baseUrl, exportado.state, TEMP);
       assert.equal(primera.cerrada, false);
     } finally {
       await primera.cerrar();
     }
     assert.equal(primera.cerrada, true);
-    assert.ok(authPath);
+    assert.ok(existsSync(authPath), "la clave del archivo sigue siendo el hostname");
 
     const segunda = await crearSesionNavegador({
       headless: true,
       dirBase: TEMP,
-      accionesIniciales: [{ accion: "perfil", dominio: "127.0.0.1" }],
+      accionesIniciales: [{ accion: "perfil", dominio: baseUrl }],
     });
     try {
       await segunda.ejecutar({ accion: "navegar", url: `${baseUrl}/auth-check` });
