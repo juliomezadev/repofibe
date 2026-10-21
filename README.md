@@ -27,8 +27,15 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-**Requisitos:** [Node.js](https://nodejs.org) 22 o superior (24 recomendado)
-y Git. El núcleo no tiene dependencias runtime externas. Las pruebas de
+La guía del paquete de esta versión está en
+[RELEASE-WINDOWS-0.7.0.md](docs/RELEASE-WINDOWS-0.7.0.md). Windows x64 es la
+plataforma objetivo validada para 0.7.0; Linux y macOS siguen pendientes de
+certificación.
+
+**Requisitos del paquete ZIP para Windows:** Windows x64 y
+[Node.js](https://nodejs.org) 22 o superior (24 recomendado); Git no es
+necesario. Para clonar y ejecutar desde el repositorio también se necesita
+Git. El núcleo no tiene dependencias runtime externas. Las pruebas de
 navegador requieren npm, Playwright `1.64.1` —fijado como dependencia de
 desarrollo— y Chromium.
 

@@ -5,6 +5,16 @@ publicación ni a una certificación de que todas las celdas de CI hayan pasado.
 La fuente de verdad para la instalación, los recibos y el rollback es el código
 de esta rama.
 
+## Alcance de la versión 0.7.0
+
+Windows x64 es la plataforma objetivo de esta versión. El equipo de referencia
+es Windows 10 Enterprise LTSC x64; Node.js 22.23.4 y 24.22.1 son las versiones
+de seguridad comprobadas en este sistema. Los requisitos de aceptación y los
+pasos de instalación, actualización y recuperación están en
+[RELEASE-WINDOWS-0.7.0.md](RELEASE-WINDOWS-0.7.0.md). Esta definición no cierra
+el gate original multiplataforma: Linux y macOS siguen pendientes, y los casos
+de symlink de archivo que Windows bloquea se mantienen parciales.
+
 ## Runtime y pruebas de navegador
 
 Los instaladores exigen Node.js 22 o superior y recomiendan Node.js 24. El

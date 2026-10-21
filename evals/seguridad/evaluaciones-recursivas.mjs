@@ -27,13 +27,39 @@ try {
   const fuera = join(TEMP, "fuera.mjs");
   writeFileSync(fuera, "export const fuera = true;\n");
   let symlinkCreado = false;
+  let codigoSymlinkError = null;
   try {
     symlinkSync(fuera, join(TEMP, "nucleo", "fuera-link.mjs"), "file");
     symlinkCreado = true;
-  } catch {}
+  } catch (error) {
+    codigoSymlinkError = error.code;
+    if (process.platform !== "win32" || !["EPERM", "EACCES", "UNKNOWN"].includes(error.code)) throw error;
+  }
   const conLink = descubrirArchivos(TEMP, { extensiones: [".mjs"] }).map(rel);
   if (symlinkCreado) assert.ok(!conLink.includes("nucleo/fuera-link.mjs"), "no debe seguir symlinks");
-  else console.log("omitido: symlink de fixture no permitido por el sistema operativo");
+  else if (process.platform === "win32") {
+    // Windows normalmente bloquea symlinks de archivo para usuarios sin
+    // privilegios/Developer Mode. Una junction de directorio prueba de forma
+    // segura que el descubridor tampoco recorre un reparse point que escape.
+    const fueraDir = join(TEMP, "fuera-dir");
+    mkdirSync(fueraDir);
+    writeFileSync(join(fueraDir, "escape.mjs"), "export const escape = true;\n");
+    let junctionCreada = false;
+    try {
+      symlinkSync(fueraDir, join(TEMP, "nucleo", "fuera-dir-link"), "junction");
+      junctionCreada = true;
+    } catch (error) {
+      if (!["EPERM", "EACCES", "UNKNOWN"].includes(error.code)) throw error;
+      console.log(`omitido: symlink de archivo y junction no permitidos por Windows (${codigoSymlinkError}/${error.code})`);
+    }
+    if (junctionCreada) {
+      const conJunction = descubrirArchivos(TEMP, { extensiones: [".mjs"] }).map(rel);
+      assert.ok(!conJunction.includes("nucleo/fuera-dir-link/escape.mjs"), "no debe recorrer junctions fuera de la raíz");
+      console.log(`omitido: symlink de archivo bloqueado por Windows (${codigoSymlinkError}); junction de directorio probado`);
+    }
+  } else {
+    throw new Error("El sistema no permitió crear el symlink de fixture fuera de Windows");
+  }
   console.log("ok: evaluaciones recursivas descubren nested, conservan consumidores, ignoran node_modules y ordenan determinísticamente");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });
