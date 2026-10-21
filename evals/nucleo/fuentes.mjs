@@ -9,14 +9,47 @@
 //   - el contenido externo se envuelve como no confiable.
 
 import { createServer } from "node:http";
+import { strict as assert } from "node:assert";
 import {
   esHostOficial, permitidoPorRobots, extraerTexto, normalizarNumero,
-  verificarEnFuente, consultar, ErrorFuente,
+  verificarEnFuente, consultar, pedir, esDestinoSeguro, ErrorFuente,
 } from "../../nucleo/fuentes.mjs";
 
 const fallos = [];
 const fallo = (m) => fallos.push(m);
 const ok = (m) => console.log(`  ok: ${m}`);
+
+async function probarRedirecciones() {
+  const permitido = "https://www.mintrabajo.gov.co";
+  const respuestas = new Map([
+    [`${permitido}/inicio`, new Response(null, { status: 302, headers: { location: "/final" } })],
+    [`${permitido}/final`, new Response("contenido oficial", { status: 200 })],
+    [`${permitido}/cadena-1`, new Response(null, { status: 307, headers: { location: "/cadena-2" } })],
+    [`${permitido}/cadena-2`, new Response(null, { status: 302, headers: { location: "https://example.com/final" } })],
+  ]);
+  const fetchImpl = async (url) => respuestas.get(url) ?? new Response("no encontrado", { status: 404 });
+
+  const final = await pedir(`${permitido}/inicio`, { fetchImpl });
+  assert.equal(final.status, 200, "allowed-domain -> allowed-domain debe funcionar");
+  assert.equal(await final.text(), "contenido oficial");
+
+  for (const destino of [
+    "https://localhost/",
+    "https://127.0.0.1/",
+    "https://10.0.0.1/",
+    "https://169.254.169.254/latest/meta-data",
+    "ftp://www.mintrabajo.gov.co/archivo",
+  ]) {
+    await assert.rejects(() => pedir(`${permitido}/inicio`, {
+      fetchImpl: async () => new Response(null, { status: 302, headers: { location: destino } }),
+    }), ErrorFuente, destino);
+  }
+
+  await assert.rejects(() => pedir(`${permitido}/cadena-1`, { fetchImpl }), ErrorFuente, "la cadena no puede terminar fuera del allowlist");
+  assert.equal(esDestinoSeguro(permitido), true);
+  assert.equal(esDestinoSeguro("https://example.com/"), false);
+  ok("redirects manuales: destino oficial permitido y localhost, IP privada, metadata, protocolo inválido y cadena externa bloqueados");
+}
 
 // ── 1. El allowlist no se elude ────────────────────────────────────────────
 {
@@ -129,6 +162,8 @@ const ok = (m) => console.log(`  ok: ${m}`);
 
   servidor.close();
 }
+
+await probarRedirecciones();
 
 if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);

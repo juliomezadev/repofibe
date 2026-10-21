@@ -17,7 +17,7 @@ y rediseñado desde cero con una tesis distinta:
 
 | | gstack | repofibe |
 |---|---|---|
-| **Instalación** | git clone + symlinks + editar CLAUDE.md (los symlinks se rompen en Windows) | Plugin nativo de Claude Code / copias planas. Windows = ciudadano de primera |
+| **Instalación** | git clone + symlinks + editar CLAUDE.md (los symlinks se rompen en Windows) | Plugin nativo de Claude Code / copias planas sin requisito de symlinks |
 | **Guardias** | `/careful` es un prompt: el modelo puede olvidarlo | Hook PreToolUse: el harness lo ejecuta SIEMPRE (destructivos → confirmar; congelado → denegar) |
 | **Estado del sprint** | Implícito en documentos sueltos | `.fabrica/sprint.json` explícito: etapa, historial, pendientes. Cualquier sesión retoma donde quedó |
 | **Docs de skills** | Plantillas + build step (drift si no rebuildeas) | Sin codegen: un SKILL.md por skill, bloques compartidos leídos en runtime |
@@ -27,17 +27,25 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-**Requisitos:** [Node.js](https://nodejs.org) 18+ y Git. Nada más — cero
-dependencias npm, cero binarios compilados en el núcleo.
+**Requisitos:** [Node.js](https://nodejs.org) 22 o superior (24 recomendado)
+y Git. El núcleo no tiene dependencias runtime externas. Las pruebas de
+navegador requieren npm, Playwright `1.64.1` —fijado como dependencia de
+desarrollo— y Chromium.
 
 > **Nota de honestidad:** algunas capacidades avanzadas usan herramientas
-> externas OPCIONALES que se importan dinámicamente y degradan con gracia si
-> no están: Playwright para navegador/QA/scrape (`/qa`, `/scrape`,
-> `/design-review`, `/autenticar`), `@xenova/transformers` para búsqueda
-> semántica de memoria (~90MB de modelo la primera vez; sin él, `/memoria`
-> cae a búsqueda textual), y el CLI de un LLM (`claude`/`gemini`) para el
-> juez tier-3. El núcleo — estado, guardias, grafo, sync, checkpoints — es
-> cero-deps de verdad.
+> Playwright se importa dinámicamente para navegador/QA/scrape (`/qa`,
+> `/scrape`, `/design-review`, `/autenticar`), pero queda declarado como
+> dependencia de desarrollo para que el checkout sea reproducible. La búsqueda
+> semántica de memoria (`@xenova/transformers`) y el CLI de un LLM
+> (`claude`/`gemini`) siguen siendo capacidades opcionales externas.
+
+Desde un checkout limpio, instala las dependencias y prepara únicamente
+Chromium:
+
+```bash
+npm ci
+npm run setup:chromium
+```
 
 ```powershell
 # Windows
@@ -78,11 +86,17 @@ Es idempotente y seguro: registra los hooks en `~/.claude/settings.json`
 respetando tu configuración y la de otros plugins, respalda tu archivo original
 en `settings.json.bak-repofibe` y no toca nada si el JSON está corrupto.
 
-El camino alternativo es el plugin nativo, que trae los hooks incluidos:
-`claude plugin marketplace add <ruta-al-clon>` y
-`claude plugin install repofibe@repofibe-marketplace`. El instalador lo intenta
-solo, pero si la CLI de `claude` está ocupada cae a modo copia — y en modo copia
-los hooks hay que activarlos con el comando de arriba.
+En Claude Code, el instalador intenta registrar el marketplace local e instalar
+el plugin nativo en el ámbito del usuario. Si la CLI no ofrece el JSON esperado,
+el estado entra en conflicto o la instalación falla, usa copias planas y
+registra los hooks en `~/.claude/settings.json`. Puedes pedir sólo esa
+activación con `node nucleo/instalar.mjs --hooks`.
+
+Comprueba el resultado con `node nucleo/diagnostico.mjs`. En modo copia informa
+si ambos hooks aparecen en `settings.json`; en modo plugin puede informar
+`registrado_no_verificado`: el registro del plugin no demuestra que Claude Code
+lo haya cargado. Reinicia Claude Code después de una instalación o cambio de
+hooks y confirma su actividad desde el host.
 
 > **Esto no es teórico.** En la instalación del propio autor, las 33 skills
 > estaban puestas y los hooks llevaban versiones sin correr: el guardia
@@ -94,8 +108,9 @@ los hooks hay que activarlos con el comando de arriba.
 
 **pensar → planear → construir → revisar → probar → shipear → retro**
 
-Cada skill registra su resultado en `.fabrica/sprint.json`; la siguiente lo
-lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
+Las acciones registrables de las skills escriben su resultado en
+`.fabrica/sprint.json`; las consultas puras no mutan el estado. La política
+operativa está en `plantillas/contrato-cierre.json`.
 
 | Skill | Especialista | Qué hace |
 |---|---|---|
@@ -175,26 +190,49 @@ secreto y comprobando que no llega al archivo.
 ## Calidad del propio repo
 
 ```bash
-node evals/validar.mjs   # tier 1: gratis, <5s, corre en cada push
-node evals/tier2.mjs     # tier 2: E2E, sesión de sprint completa simulada
+npm ci
+npm run setup:chromium
+node evals/validar.mjs
+node evals/tier2.mjs
 ```
+
+El [workflow de CI](.github/workflows/evals.yml) ejecuta Tier 1 y Tier 2 por
+separado. Tier 1 prepara Playwright y Chromium; Tier 2 no los necesita. La
+matriz usa Ubuntu y Windows con Node 22 y 24, y macOS con Node 24 (macOS/Node
+22 está excluido en el workflow actual).
 
 Tier 1 valida frontmatter y convenciones de las 33 skills, manifiestos,
 hooks — y ejecuta de verdad `estado`, `memoria`, `guardia`, `grafo`,
 `secretos`, `salud` y `navegador` contra directorios temporales (incluidos
 los casos "rm -rf → ask", "--force-with-lease → silencio", "edición fuera
 del congelado → deny", y detección de prompt-injection con Chromium real
-cuando Playwright está instalado). Tier 2 encadena una sesión de sprint
+cuando están instalados Playwright y Chromium). Tier 2 encadena una sesión de sprint
 completa (pensar→retro, ~15 subprocesos reales) verificando que el estado
 fluye correctamente entre `estado.mjs`, `checkpoint.mjs`, `grafo.mjs` y
-`pruebas.mjs` — el tipo de bug de integración que tests aislados no
-atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
+`pruebas.mjs` — el tipo de bug de integración que tests aislados no atrapan.
+Tier 2 incluye además una suite de cinco skills juzgadas por un modelo; sin
+`ANTHROPIC_API_KEY` esa suite queda `OMITIDA` y no cuenta como verificada ni
+como PASS. El workflow no inyecta esa credencial, así que CI no ejecuta esa
+evaluación de pago. Las evals que necesitan crear symlinks o junctions pueden
+marcar ese caso como omitido si los permisos del sistema operativo lo impiden;
+un caso omitido tampoco acredita cobertura. Consulta los límites de plataforma,
+recibos y rollback en [Robustez 0.7.0](docs/ROBUSTEZ-0.7.0.md).
+La evaluación propuesta de Harness² está separada del producto y no añade
+dependencias: [diseño del experimento](docs/EXPERIMENTO-HARNESS2.md).
 
-## Prioridades de desarrollo actuales
+El estado persistido y la memoria contienen datos locales del usuario; las
+sesiones `storageState` viven en `.fabrica/auth/` y no entran en sync. La
+memoria histórica se trata como dato no confiable. `sync pull` propaga errores
+de Git y distingue conflictos de éxito. El grafo se reutiliza sólo si
+coinciden el commit y el fingerprint de sus fuentes; `salud` mide la respuesta
+HTTP real antes de emitir un veredicto.
+El escáner experimental de cadena de suministro auditado en Batch 4 no forma
+parte del producto ni se cablea en `hooks/hooks.json`.
 
-- Conectar componentes construidos pero todavía huérfanos.
-- Mejorar la integración multi-host.
-- Mantener evals deterministas.
+## Hoja de ruta
+
+- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory).
+- **v0.5** — `/pair-agent`, embeddings/búsqueda semántica.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 

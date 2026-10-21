@@ -31,10 +31,8 @@ Requiere Playwright; si no está instalado, el comando lo dice.
 node <RAIZ>/nucleo/cookies.mjs guardar <dominio>
 ```
 
-Abre un Chromium **visible** en `https://<dominio>`. El usuario inicia
-sesión a mano (incluido MFA/CAPTCHA si aplica — por eso es visible), y al
-cerrar la ventana se guarda el `storageState` en
-`.fabrica/auth/<dominio>.json`. El perfil temporal se limpia solo.
+Abre un Chromium **visible** en `https://<dominio>`. El usuario inicia sesión a mano (incluido MFA/CAPTCHA si aplica). Con Chromium todavía abierto, confirma en la terminal escribiendo `s` y Enter para guardar el `storageState` en `.fabrica/auth/<dominio>.json`. El perfil temporal se limpia solo.
+Si se cierra la ventana antes de confirmar, se cancela la captura y se conserva cualquier sesión anterior. La clave del archivo es el hostname normalizado; el origen incluye esquema, hostname y puerto, y localStorage solo se restaura para ese origen exacto.
 
 **Guardarraíles:** el estado se guarda LOCAL, por dominio, y nunca se
 imprime a la terminal. Es material de sesión — trátalo como credencial:
@@ -53,10 +51,7 @@ node <RAIZ>/nucleo/navegador.mjs ejecutar '[
 ]'
 ```
 
-`perfil` carga el storageState guardado antes de crear la página; si no hay
-sesión guardada para ese dominio, falla con un mensaje claro que dice cómo
-crearla. `/qa`, `/scrape` y `/design-review` lo usan igual cuando la página
-a probar requiere login.
+`perfil` recrea el contexto cargando el storageState para el origen completo (esquema, hostname y puerto) de la URL objetivo. Las referencias (`e1`, `e2`...) de snapshots anteriores dejan de ser válidas. Si no hay sesión guardada para ese hostname u origen, falla con un mensaje claro que dice cómo crearla. `/qa`, `/scrape` y `/design-review` siguen el mismo contrato cuando la página requiere login.
 
 ## Gestionar sesiones guardadas
 

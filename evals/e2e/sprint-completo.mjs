@@ -12,7 +12,7 @@
 // Sin LLM: las assertions son sobre archivos y estado, no sobre calidad de
 // prosa (eso es tier 3, LLM-juez). Por eso corre gratis y determinista,
 // pero es más lento que tier 1 — vive fuera de validar.mjs a propósito
-// (la promesa de tier 1 es <5s; esto encadena ~15 subprocesos reales).
+// (tier 1 corre en cada push; esto encadena ~15 subprocesos reales).
 //
 // Uso: node evals/e2e/sprint-completo.mjs
 

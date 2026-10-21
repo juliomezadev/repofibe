@@ -146,14 +146,14 @@ ok("acepta completado solo con pasos y gates respaldados", () => {
     riesgo,
     modo: tarea.modo,
     pasos: [{ id: "p1", descripcion: "Aplicar y verificar la corrección", estado: "completado" }],
-    gates: [{ id: "tests", tipo: "prueba", descripcion: "Prueba de regresión" }],
+    gates: [{ id: "tests", tipo: "resultado", descripcion: "Resultado registrado" }],
   });
   plan.estado = "completado";
   const evidencia = crearEvidencia({
     id: "ev-tests",
     gateId: "tests",
-    tipo: "prueba",
-    fuente: "node --test",
+    tipo: "resultado",
+    fuente: "inspección manual documentada",
     exito: true,
     exitCode: 0,
   });
@@ -194,6 +194,19 @@ ok("CLI valida un archivo de estado y usa código de salida", () => {
   } finally {
     rmSync(carpeta, { recursive: true, force: true });
   }
+});
+
+ok("clasifica git push --force como destructivo, incluso combinado con lease", () => {
+  for (const objetivo of [
+    "ejecuta git push --force origin main",
+    "ejecuta git push --force --force-with-lease origin main",
+    "ejecuta git push --force-with-lease --force origin main",
+  ]) {
+    const riesgo = clasificarRiesgo({ objetivo });
+    assert.equal(riesgo.nivel, "alto", objetivo);
+    assert.ok(riesgo.requiereAprobacion, objetivo);
+  }
+  assert.equal(clasificarRiesgo({ objetivo: "ejecuta git push --force-with-lease origin main" }).nivel, "bajo");
 });
 
 console.log(`\nInteligencia: ${pasadas} pruebas pasaron.`);

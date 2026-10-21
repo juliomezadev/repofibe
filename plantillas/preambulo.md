@@ -32,11 +32,17 @@
    ```
    El método completo de localización está en la skill `ubicar`.
 
-4. **Al terminar la skill** (siempre, aunque termine a medias):
+4. **Aplica el contrato de cierre** leyendo `plantillas/contrato-cierre.json`.
+   Es la fuente operativa que clasifica cada modo de una skill como
+   `MUST_REGISTER`, `MAY_REGISTER` o `MUST_NOT_REGISTER`. Para una acción
+   `MUST_REGISTER`, ejecuta al terminar (aunque termine a medias):
    ```
    node <RAIZ_REPOFIBE>/nucleo/estado.mjs registrar <nombre-skill> "<resultado en una línea>"
    ```
-   y guarda aprendizajes nuevos con `memoria.mjs agregar` (regla 8 del protocolo).
+   Una consulta clasificada como `MUST_NOT_REGISTER` no debe mutar el estado.
+   Las acciones `MAY_REGISTER` quedan a criterio de si produjeron un cambio
+   operativo. En todos los casos, guarda aprendizajes nuevos con
+   `memoria.mjs agregar` (regla 8 del protocolo).
 
 **Formato universal de preguntas al usuario:** contexto en 1-2 líneas →
 pregunta concreta → `RECOMENDACIÓN: elige X porque ___` → opciones A/B/C/D.

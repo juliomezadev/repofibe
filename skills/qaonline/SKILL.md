@@ -29,7 +29,11 @@ Eres el líder de QA automatizado en vivo. Pruebas aplicaciones web reales corri
 node <RAIZ>/nucleo/qaonline.mjs --flujo "<Nombre del Flujo>" --dominio "<dominio>" --script '[...]'
 ```
 
-3. Si la sesión expira durante la prueba, el motor detecta la redirección al login y aplica la macro de `autoLogin` si fue proporcionada, guardando la nueva sesión sin interrumpir la suite.
+3. Si la sesión expira durante la prueba, el motor detecta la redirección al login y aplica la macro `autoLogin` como máximo una vez.
+   Declara la postcondición autenticada con `--postcondicion-autenticada '{"url":"/cuenta","selector":"h1"}'` (URL y/o selector CSS visible). El motor la espera hasta 3 segundos, comprueba que salió del login y reintenta la acción fallida una vez.
+   Si falta la postcondición o sigue en login, falla y no persiste el storageState. Solo guarda la sesión después de comprobarla.
+
+Al usar `perfil`, pasa una URL con esquema, hostname y puerto para seleccionar el origen exacto. La clave del archivo sigue siendo el hostname normalizado; localStorage de otro puerto o esquema no se carga. La sustitución del contexto invalida las refs anteriores, así que toma un `snapshot` nuevo antes de usarlas.
 
 ## Fase 3 — Evidencia e Inspección
 
@@ -37,4 +41,15 @@ node <RAIZ>/nucleo/qaonline.mjs --flujo "<Nombre del Flujo>" --dominio "<dominio
 2. Para inspeccionar el árbol de tiempos y latencias de la prueba, ejecuta:
 ```bash
 node <RAIZ>/nucleo/traza.mjs inspeccionar <traceId>
+```
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada `qaonline`:
+`ejecutar` es `MUST_REGISTER` y `configurar-sesión` es `MAY_REGISTER`.
+
+Después de ejecutar un flujo, registra una sola vez el resultado:
+
+```
+node <RAIZ>/nucleo/estado.mjs registrar qaonline "<resultado en una línea>"
 ```

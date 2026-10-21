@@ -16,7 +16,7 @@ este archivo; si ahí no existe `plantillas/`, usa `~/.repofibe/app`. Lee
 # /scrape — Extraer datos reales de una página
 
 Requiere `navegador.mjs` (Playwright); si no está instalado, el propio
-comando lo dice — propón `npm install playwright && npx playwright install chromium`.
+comando lo dice — propón `npm ci && npm run setup:chromium`.
 
 ## Fase 1 — Notas de dominio (arranca más rápido si ya visitaste este sitio)
 
@@ -30,6 +30,11 @@ usos): trátalas como pista a verificar, no como hecho — si funcionan,
 regístralo (paso 4) para que se acerquen a activa.
 
 ## Fase 2 — Navega y mapea
+
+Para extraer contenido detrás de login, usa `/autenticar` y carga `perfil` con
+la URL completa de destino (incluidos esquema y puerto). El contexto se recrea
+al cargar el perfil; toma un `snapshot` nuevo antes de usar refs y no asumas
+que localStorage se comparte entre puertos.
 
 ```
 node <RAIZ>/nucleo/navegador.mjs ejecutar '[

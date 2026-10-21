@@ -10,8 +10,15 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 const DIR_TRAZA = mkdtempSync(join(tmpdir(), "repofibe-qaonline-traza-"));
+const REPO = process.cwd();
+const TEMP = mkdtempSync(join(tmpdir(), "repofibe-qaonline-cwd-"));
 process.env.REPOFIBE_TRAZA_DIR = DIR_TRAZA;
-process.on("exit", () => { try { rmSync(DIR_TRAZA, { recursive: true, force: true }); } catch {} });
+process.chdir(TEMP);
+process.on("exit", () => {
+  try { process.chdir(REPO); } catch {}
+  try { rmSync(DIR_TRAZA, { recursive: true, force: true }); } catch {}
+  try { rmSync(TEMP, { recursive: true, force: true }); } catch {}
+});
 
 const { ejecutarQAOnline } = await import("../../nucleo/qaonline.mjs");
 import { createServer } from "node:http";
@@ -33,7 +40,7 @@ async function main() {
       }
     } else if (req.url === "/login") {
       res.writeHead(200, { "Content-Type": "text/html" });
-      res.end("<h1>Formulario Login</h1><input id='u'/><button id='b'>Entrar</button>");
+      res.end("<h1>Formulario Login</h1><input id='u'/><button id='b' onclick=\"document.cookie='session=ok; path=/'; location='/dashboard'\">Entrar</button>");
     } else {
       res.writeHead(404);
       res.end();
@@ -48,15 +55,18 @@ async function main() {
     // 2. Ejecutar QA en Vivo con macro de Self-Healing Auth
     const res = await ejecutarQAOnline({
       flujo: "Test Dashboard Mock",
-      dominio: "127.0.0.1",
+      dominio: baseUrl,
       script: [
         { accion: "navegar", url: `${baseUrl}/dashboard` },
         { accion: "snapshot" }
       ],
+      dirBase: TEMP,
       macroLogin: [
         { accion: "navegar", url: `${baseUrl}/login` },
-        { accion: "snapshot" }
-      ]
+        { accion: "snapshot" },
+        { accion: "click", ref: "e2" }
+      ],
+      postcondicionAutenticada: { url: `${baseUrl}/dashboard`, selector: "h1" },
     });
 
     if (!res.ok) {
@@ -75,6 +85,10 @@ async function main() {
       process.exit(1);
     }
 
+    if (!md.includes("Dashboard Protegido") || !md.includes("Self-Healing Auth activado")) {
+      console.error("Error: Self-Healing no conservó la sesión autenticada", md);
+      process.exit(1);
+    }
     console.log("ok: /repofibe-qaonline con Self-Healing y Evidencia en Markdown verificado");
   } catch (err) {
     if (err.message && err.message.includes("Playwright no está instalado")) {
@@ -87,7 +101,7 @@ async function main() {
       // la declare parcial (encontrado auditando, 2026-07-25).
       console.log("ok: contratos y pipeline de fallback verificados (sin navegador)");
       console.log("omitido: Self-Healing Auth y evidencia en Markdown NO se probaron — requieren Playwright. " +
-        "La función principal de esta skill queda SIN verificar: `npm install playwright && npx playwright install chromium`");
+        "La función principal de esta skill queda SIN verificar: `npm ci && npm run setup:chromium`");
     } else {
       throw err;
     }

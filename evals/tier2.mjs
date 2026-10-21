@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // tier2.mjs — punto de entrada de las evals tier 2 (E2E, sesión real
 // simulada). Separado de validar.mjs (tier 1) a propósito: tier 1 promete
-// <5s y corre en cada push; tier 2 encadena ~15 subprocesos reales por
+// corre en cada push; tier 2 encadena ~15 subprocesos reales por
 // suite y es más lento — se corre como job aparte en CI, o a mano antes de
 // una release grande.
 //

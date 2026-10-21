@@ -60,6 +60,10 @@ ciclos; si no llega a 7, di qué información falta del usuario.
    ```
    Si el resumen en stderr reporta hallazgos, usa la salida redactada (no el
    borrador original) y avisa al usuario qué tipos se redactaron.
+   El escáner reconoce asignaciones comunes en objetos JSON y registros JSONL
+   y conserva la estructura al reemplazar valores. Es una detección por
+   patrones de alta confianza, no prueba que el borrador esté libre de todo
+   secreto; revisa manualmente antes de archivarlo.
 2. Guarda en `docs/fabrica/specs/AAAA-MM-DD-<tema>-spec.md`.
 3. Registra:
    ```

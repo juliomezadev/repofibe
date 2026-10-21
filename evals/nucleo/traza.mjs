@@ -159,7 +159,10 @@ function correrGuardia(payload, cwd) {
 
   // 3. Fail-open: con la traza imposibilitada, el guardia debe seguir intacto.
   const casaRota = mkdtempSync(join(tmpdir(), "repofibe-guardia-roto-"));
-  writeFileSync(join(casaRota, ".fabrica"), "archivo donde debería ir el directorio");
+  // Mantén la raíz de políticas válida: si `.fabrica` no es un directorio, el
+  // guardia debe negar shell por política corrupta antes de llegar a la traza.
+  mkdirSync(join(casaRota, ".fabrica"), { recursive: true });
+  mkdirSync(join(casaRota, ".fabrica", "traza.jsonl"));
   const rRoto = correrGuardia({ tool_name: "Bash", tool_input: { command: "git reset --hard" } }, casaRota);
   let decisionRota = null;
   try { decisionRota = JSON.parse(rRoto.stdout).hookSpecificOutput.permissionDecision; } catch {}

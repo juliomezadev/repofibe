@@ -16,29 +16,221 @@
 //   node grafo.mjs externo <dir> resumen    # resumen de un graph.json externo (NetworkX)
 //   node grafo.mjs externo <dir> frescura   # manifest.json vs disco
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, renameSync, existsSync, statSync } from "node:fs";
-import { join, dirname, relative, extname } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, renameSync, existsSync, statSync } from "node:fs";
+import { join, dirname, relative, extname, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { descubrirArchivos } from "./archivos.mjs";
 
 const RAIZ = process.cwd();
 const ARCHIVO = join(RAIZ, ".fabrica", "grafo.json");
-const IGNORAR = new Set(["node_modules", ".git", "dist", "build", "out", ".next", "coverage", ".fabrica", "__pycache__", ".venv", "venv", "target", "vendor", ".cache"]);
 const EXTS = new Set([".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"]);
 
 export const norm = (p) => p.split("\\").join("/");
 
-function archivosCodigo(dir, base, salida) {
-  let entradas;
-  try { entradas = readdirSync(dir, { withFileTypes: true }); } catch { return salida; }
-  for (const e of entradas) {
-    if (e.isDirectory()) {
-      if (!IGNORAR.has(e.name) && !e.name.startsWith(".")) archivosCodigo(join(dir, e.name), base, salida);
-    } else if (EXTS.has(extname(e.name).toLowerCase())) {
-      salida.push(norm(relative(base, join(dir, e.name))));
+function archivosCodigo() {
+  return descubrirArchivos(RAIZ, { extensiones: EXTS })
+    .map((p) => norm(relative(RAIZ, p)));
+}
+
+function gitValor(args) {
+  try {
+    return execFileSync("git", ["-C", RAIZ, ...args], {
+      encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch { return null; }
+}
+
+function jsonConfig(texto) {
+  let limpio = "";
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (c === '"') {
+      limpio += c;
+      for (i++; i < texto.length; i++) {
+        const dentro = texto[i]; limpio += dentro;
+        if (dentro === "\\") { if (i + 1 < texto.length) limpio += texto[++i]; }
+        else if (dentro === '"') break;
+      }
+      continue;
+    }
+    if (c === "/" && texto[i + 1] === "/") {
+      limpio += "  "; i += 2;
+      while (i < texto.length && texto[i] !== "\n") { limpio += " "; i++; }
+      if (i < texto.length) limpio += "\n";
+      continue;
+    }
+    if (c === "/" && texto[i + 1] === "*") {
+      limpio += "  "; i += 2;
+      while (i < texto.length && !(texto[i] === "*" && texto[i + 1] === "/")) {
+        limpio += texto[i] === "\n" ? "\n" : " "; i++;
+      }
+      if (i < texto.length) { limpio += "  "; i++; }
+      continue;
+    }
+    limpio += c;
+  }
+
+  let sinComasFinales = "";
+  let enCadena = false; let escapado = false;
+  for (let i = 0; i < limpio.length; i++) {
+    const c = limpio[i];
+    if (enCadena) {
+      sinComasFinales += c;
+      if (escapado) escapado = false;
+      else if (c === "\\") escapado = true;
+      else if (c === '"') enCadena = false;
+      continue;
+    }
+    if (c === '"') { enCadena = true; sinComasFinales += c; continue; }
+    if (c === ",") {
+      let siguiente = i + 1;
+      while (/\s/.test(limpio[siguiente] ?? "")) siguiente++;
+      if (limpio[siguiente] === "}" || limpio[siguiente] === "]") continue;
+    }
+    sinComasFinales += c;
+  }
+  return JSON.parse(sinComasFinales);
+}
+
+function rutaExtends(configPath, spec) {
+  if (typeof spec !== "string" || !spec.trim() || !spec.startsWith(".")) {
+    throw new Error(`extends no local o inválido en ${configPath}`);
+  }
+  const base = resolve(dirname(configPath), spec);
+  if (extname(base).toLowerCase() === ".json" || extname(base).toLowerCase() === ".jsonc") return base;
+  if (existsSync(`${base}.json`)) return `${base}.json`;
+  if (existsSync(join(base, "tsconfig.json"))) return join(base, "tsconfig.json");
+  return `${base}.json`;
+}
+
+function resolverConfig() {
+  const contenidos = new Map();
+  const errores = [];
+  const cadenas = [];
+  const raizConfigs = ["tsconfig.json", "jsconfig.json"];
+
+  function cargar(configPath, pila = []) {
+    const absoluto = resolve(configPath);
+    if (pila.includes(absoluto)) {
+      errores.push(`ciclo extends: ${[...pila, absoluto].map((p) => norm(relative(RAIZ, p))).join(" -> ")}`);
+      return [];
+    }
+    let texto;
+    try { texto = readFileSync(absoluto, "utf8"); }
+    catch (error) { errores.push(`no se puede leer ${norm(relative(RAIZ, absoluto))}: ${error.message}`); return []; }
+    contenidos.set(absoluto, texto);
+    let config;
+    try { config = jsonConfig(texto); }
+    catch (error) { errores.push(`configuración inválida ${norm(relative(RAIZ, absoluto))}: ${error.message}`); return []; }
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      errores.push(`configuración inválida ${norm(relative(RAIZ, absoluto))}: raíz JSON debe ser objeto`);
+      return [];
+    }
+    let cadena = [];
+    if (config.extends !== undefined) {
+      try { cadena = cargar(rutaExtends(absoluto, config.extends), [...pila, absoluto]); }
+      catch (error) { errores.push(error.message); }
+    }
+    return [...cadena, { config, archivo: absoluto }];
+  }
+
+  const configs = [];
+  for (const nombre of raizConfigs) {
+    const absoluto = resolve(RAIZ, nombre);
+    if (!existsSync(absoluto)) { contenidos.set(absoluto, "<ausente>"); continue; }
+    const cadena = cargar(absoluto);
+    cadenas.push({ raiz: nombre, archivos: cadena.map((item) => norm(relative(RAIZ, item.archivo))) });
+    configs.push(...cadena);
+  }
+
+  const aliasPorPatron = new Map();
+  for (const { config, archivo } of configs) {
+    const compiler = config.compilerOptions ?? {};
+    if (compiler === null || typeof compiler !== "object" || Array.isArray(compiler)) {
+      errores.push(`compilerOptions inválido en ${norm(relative(RAIZ, archivo))}`); continue;
+    }
+    const paths = compiler.paths ?? {};
+    if (paths === null || typeof paths !== "object" || Array.isArray(paths)) {
+      errores.push(`compilerOptions.paths inválido en ${norm(relative(RAIZ, archivo))}`); continue;
+    }
+    const baseUrl = typeof compiler.baseUrl === "string" ? resolve(dirname(archivo), compiler.baseUrl) : dirname(archivo);
+    for (const [patron, destinos] of Object.entries(paths)) {
+      if (!Array.isArray(destinos) || destinos.some((destino) => typeof destino !== "string")) {
+        errores.push(`destino paths inválido para ${patron} en ${norm(relative(RAIZ, archivo))}`); continue;
+      }
+      const alias = destinos.map((destino) => ({
+        prefijo: patron.replace(/\*$/, ""),
+        comodin: patron.endsWith("*"),
+        destino: norm(relative(RAIZ, resolve(baseUrl, destino.replace(/\*$/, "")))),
+      }));
+      aliasPorPatron.set(patron, alias);
     }
   }
-  return salida;
+
+  for (const ruta of contenidos.keys()) {
+    const key = norm(relative(RAIZ, ruta));
+    if (!cadenas.some((c) => c.archivos?.includes(key))) {
+      // También fija en el fingerprint los JSON raíz ausentes y los extends
+      // defectuosos que no pudieron formar parte de la cadena.
+      cadenas.push({ dependencia: key });
+    }
+  }
+  const hash = createHash("sha256");
+  for (const [ruta, texto] of [...contenidos].sort(([a], [b]) => a.localeCompare(b))) {
+    hash.update(norm(relative(RAIZ, ruta))); hash.update("\0"); hash.update(texto); hash.update("\0");
+  }
+  for (const error of errores) { hash.update("ERROR\0"); hash.update(error); hash.update("\0"); }
+  return {
+    aliases: [...aliasPorPatron.values()].flat(),
+    metadata: { fingerprint: hash.digest("hex"), cadenas, errores },
+  };
+}
+
+function fingerprintFuente(archivos, configuracion) {
+  const hash = createHash("sha256");
+  for (const archivo of archivos) {
+    hash.update(archivo);
+    hash.update("\0");
+    try { hash.update(readFileSync(join(RAIZ, archivo), "utf8")); }
+    catch { hash.update("<archivo-no-legible>"); }
+    hash.update("\0");
+  }
+  hash.update("CONFIG\0"); hash.update(configuracion.fingerprint);
+  return hash.digest("hex");
+}
+
+function estadoFuente(archivos = archivosCodigo()) {
+  const configuracion = resolverConfig().metadata;
+  const commit = gitValor(["rev-parse", "HEAD"]);
+  const estadoGit = gitValor(["status", "--porcelain", "--untracked-files=all"]);
+  let sucio = null;
+  if (estadoGit !== null) {
+    sucio = estadoGit.split("\n").filter(Boolean).some((linea) => {
+      const ruta = linea.slice(3).split(" -> ").at(-1).replaceAll('"', "");
+      return EXTS.has(extname(ruta).toLowerCase());
+    });
+  }
+  return { commit, sucio, fingerprint: fingerprintFuente(archivos, configuracion), configuracion };
+}
+
+export function evaluarFrescura(grafo) {
+  if (!grafo || grafo.version !== 2 || !grafo.fuente?.fingerprint) {
+    return { fresco: false, razon: "metadata ausente o formato antiguo" };
+  }
+  const actual = estadoFuente();
+  if (actual.configuracion.errores.length) {
+    return { fresco: false, razon: `configuración del resolver no confiable: ${actual.configuracion.errores.join("; ")}`, actual };
+  }
+  const fresco = grafo.fuente.commit === actual.commit &&
+    grafo.fuente.sucio === actual.sucio &&
+    grafo.fuente.fingerprint === actual.fingerprint;
+  return {
+    fresco,
+    razon: fresco ? "commit/fingerprint coinciden" : "commit, working tree o fingerprint difieren",
+    actual,
+  };
 }
 
 // Quita comentarios antes de buscar imports. Sin esto, un import comentado o
@@ -72,38 +264,6 @@ function extraerImports(textoCrudo, esPython) {
   return encontrados;
 }
 
-// Alias de tsconfig/jsconfig (`compilerOptions.paths`). Sin esto, un proyecto
-// Next/Vite/TS normal —donde `@/x` es la forma habitual de importar— perdía
-// esas aristas del grafo. Consecuencia real y grave: `pruebas.mjs afectadas`
-// dejaba fuera pruebas que SÍ estaban afectadas, o sea shipear roto creyendo
-// que se probó. Encontrado auditando el 2026-07-25.
-let ALIAS = null;
-function alias() {
-  if (ALIAS) return ALIAS;
-  ALIAS = [];
-  for (const archivo of ["tsconfig.json", "jsconfig.json"]) {
-    try {
-      const crudo = readFileSync(join(RAIZ, archivo), "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, "")       // tsconfig admite comentarios
-        .replace(/(^|[^:])\/\/[^\n]*/g, "$1")
-        .replace(/,(\s*[}\]])/g, "$1");         // y comas colgantes
-      const cfg = JSON.parse(crudo);
-      const paths = cfg?.compilerOptions?.paths ?? {};
-      const baseUrl = (cfg?.compilerOptions?.baseUrl ?? ".").replace(/^\.\//, "").replace(/\/$/, "");
-      for (const [patron, destinos] of Object.entries(paths)) {
-        for (const destino of [].concat(destinos)) {
-          ALIAS.push({
-            prefijo: patron.replace(/\*$/, ""),
-            comodin: patron.endsWith("*"),
-            destino: norm(join(baseUrl === "." ? "" : baseUrl, destino.replace(/\*$/, "").replace(/^\.\//, ""))),
-          });
-        }
-      }
-    } catch { /* sin tsconfig, o ilegible: se sigue sin alias */ }
-  }
-  return ALIAS;
-}
-
 // Prueba las extensiones e índices habituales contra los archivos del proyecto.
 function candidatosDe(base, conjunto) {
   const candidatos = [base, ...[".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".py"].map((e) => base + e),
@@ -112,13 +272,13 @@ function candidatosDe(base, conjunto) {
 }
 
 // Resuelve un especificador relativo a un archivo real del proyecto.
-function resolver(espec, desde, conjunto) {
+function resolver(espec, desde, conjunto, aliases) {
   if (espec.startsWith(".")) {
     return candidatosDe(norm(join(dirname(desde), espec)), conjunto);
   }
 
   // Alias antes de darlo por paquete externo.
-  for (const a of alias()) {
+  for (const a of aliases) {
     if (!espec.startsWith(a.prefijo)) continue;
     const resto = a.comodin ? espec.slice(a.prefijo.length) : "";
     const encontrado = candidatosDe(norm(join(a.destino, resto)), conjunto);
@@ -133,8 +293,9 @@ function resolver(espec, desde, conjunto) {
   return null; // paquete externo
 }
 
-function generar() {
-  const archivos = archivosCodigo(RAIZ, RAIZ, []);
+function generar({ silencioso = false } = {}) {
+  const configResolver = resolverConfig();
+  const archivos = archivosCodigo();
   const conjunto = new Set(archivos);
   const aristas = {}; const externos = {};
   for (const a of archivos) {
@@ -142,22 +303,29 @@ function generar() {
     try { texto = readFileSync(join(RAIZ, a), "utf8"); } catch { continue; }
     const deps = new Set(); const ext = new Set();
     for (const espec of extraerImports(texto, a.endsWith(".py"))) {
-      const r = resolver(espec, a, conjunto);
+      const r = resolver(espec, a, conjunto, configResolver.aliases);
       if (r && r !== a) deps.add(r);
       else if (!r && !espec.startsWith(".")) ext.add(espec.split("/")[0]);
     }
     if (deps.size) aristas[a] = [...deps];
     if (ext.size) externos[a] = [...ext];
   }
-  let commit = null;
-  try { commit = execFileSync("git", ["-C", RAIZ, "rev-parse", "--short", "HEAD"], { encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch {}
-  const grafo = { generado: new Date().toISOString(), commit, archivos: archivos.length, aristas, externos };
+  const fuente = estadoFuente(archivos);
+  const grafo = {
+    version: 2,
+    generado: new Date().toISOString(),
+    commit: fuente.commit,
+    fuente,
+    archivos: archivos.length,
+    aristas,
+    externos,
+  };
   mkdirSync(join(RAIZ, ".fabrica"), { recursive: true });
   const tmp = ARCHIVO + ".tmp";
   writeFileSync(tmp, JSON.stringify(grafo) + "\n", "utf8");
   renameSync(tmp, ARCHIVO);
   const nAristas = Object.values(aristas).reduce((s, d) => s + d.length, 0);
-  console.log(`Grafo generado: ${archivos.length} archivos, ${nAristas} dependencias internas (commit ${commit ?? "sin git"}).`);
+  if (!silencioso) console.log(`Grafo generado: ${archivos.length} archivos, ${nAristas} dependencias internas (commit ${fuente.commit ?? "sin git"}).`);
   return grafo;
 }
 
@@ -165,11 +333,19 @@ export function cargar() {
   try { return JSON.parse(readFileSync(ARCHIVO, "utf8")); } catch { return null; }
 }
 
-export function cargarOGenerar() {
+export function cargarOGenerar({ silencioso = false, diagnostico = console.log } = {}) {
   const g = cargar();
-  if (g) return g;
-  console.log("(sin grafo previo — generando)");
-  return generar();
+  if (g) {
+    const frescura = evaluarFrescura(g);
+    if (frescura.fresco) return g;
+    if (!silencioso) diagnostico(`(grafo no reutilizable: ${frescura.razon} — regenerando)`);
+  } else {
+    if (!silencioso) diagnostico("(sin grafo previo — generando)");
+  }
+  const nuevo = generar({ silencioso });
+  const frescuraNueva = evaluarFrescura(nuevo);
+  if (!frescuraNueva.fresco) throw new Error(`grafo NO CONFIABLE: ${frescuraNueva.razon}`);
+  return nuevo;
 }
 
 export function inverso(aristas) {
@@ -242,14 +418,9 @@ switch (cmd) {
   case "frescura": {
     const g = cargar();
     if (!g) { console.log("Sin grafo. Genera: node grafo.mjs generar"); break; }
-    const desde = new Date(g.generado).getTime();
-    const actuales = archivosCodigo(RAIZ, RAIZ, []);
-    let cambiados = 0;
-    for (const a of actuales) { try { if (statSync(join(RAIZ, a)).mtimeMs > desde) cambiados++; } catch {} }
-    const nuevos = actuales.length - g.archivos;
-    const pct = g.archivos ? Math.round((cambiados / g.archivos) * 100) : 0;
-    console.log(`Grafo de ${g.generado.slice(0, 16)} (commit ${g.commit ?? "—"}): ${cambiados} modificados desde entonces (${pct}%), ${nuevos >= 0 ? "+" + nuevos : nuevos} archivos.`);
-    console.log(pct > 10 || Math.abs(nuevos) > 3 ? "VEREDICTO: NO CONFIABLE — regenera con: node grafo.mjs generar" : "VEREDICTO: confiable.");
+    const frescura = evaluarFrescura(g);
+    console.log(`Grafo de ${g.generado?.slice(0, 16) ?? "fecha desconocida"} (commit ${g.commit ?? "—"}): ${frescura.razon}.`);
+    console.log(frescura.fresco ? "VEREDICTO: confiable (metadata y fingerprint coinciden)." : "VEREDICTO: NO CONFIABLE — regenera con: node grafo.mjs generar");
     break;
   }
 

@@ -1,6 +1,7 @@
 // evidencia.mjs — gates, estado y criterio de finalización verificable.
 
 import { validarEvidencia, validarPlan, validarTarea } from "./contratos.mjs";
+import { verificarEjecucion } from "./ejecuciones.mjs";
 import { resolverPolitica } from "./modos.mjs";
 
 const TRANSICIONES = new Map([
@@ -16,32 +17,37 @@ export function validarTransicionEstado(desde, hacia) {
   return { valido, errores: valido ? [] : [`transición no permitida: ${desde} → ${hacia}`] };
 }
 
-function evidenciaParaGate(gate, evidencias) {
+function evidenciaParaGate(gate, evidencias, workspace) {
   return evidencias.find((evidencia) => {
     if (evidencia.gateId !== gate.id || evidencia.exito !== true || !validarEvidencia(evidencia).valido) return false;
-    if (gate.tipo === "aprobacion" && evidencia.tipo !== "aprobacion") return false;
+    if (evidencia.tipo !== (gate.tipo ?? "resultado")) return false;
+    if (evidencia.tipo === "prueba") {
+      if (evidencia.version !== 2 || evidencia.procedencia !== "observada") return false;
+      if (!verificarEjecucion(evidencia, gate, workspace)) return false;
+    }
     return true;
   });
 }
 
-export function validarEstado({ tarea, plan, evidencias = [] } = {}) {
+export function validarEstado({ tarea, plan, evidencias = [], workspace = process.cwd() } = {}) {
   const errores = [];
   const advertencias = [];
   const faltantes = [];
+  const listaEvidencias = Array.isArray(evidencias) ? evidencias : [];
   const tareaValida = validarTarea(tarea);
   const planValido = validarPlan(plan);
   errores.push(...tareaValida.errores, ...planValido.errores);
   if (tareaValida.valido && planValido.valido && plan.tareaId !== tarea.id) errores.push("plan.tareaId no coincide con tarea.id");
   if (!Array.isArray(evidencias)) errores.push("evidencias debe ser una lista");
 
-  const evidenciasValidas = Array.isArray(evidencias) ? evidencias.map((evidencia) => validarEvidencia(evidencia)) : [];
+  const evidenciasValidas = listaEvidencias.map((evidencia) => validarEvidencia(evidencia));
   evidenciasValidas.forEach((resultado, indice) => {
     if (!resultado.valido) errores.push(`evidencia ${indice + 1}: ${resultado.errores.join(", ")}`);
   });
 
   if (planValido.valido && Array.isArray(plan.gates)) {
     for (const gate of plan.gates.filter((item) => item.requerido !== false)) {
-      if (!evidenciaParaGate(gate, evidencias)) faltantes.push(gate.id);
+      if (!evidenciaParaGate(gate, listaEvidencias, workspace)) faltantes.push(gate.id);
     }
   }
 
@@ -61,7 +67,7 @@ export function validarEstado({ tarea, plan, evidencias = [] } = {}) {
   if (plan?.estado === "completado" && faltantes.length) errores.push(`falta evidencia para gates: ${faltantes.join(", ")}`);
 
   const requeridos = planValido.valido && Array.isArray(plan.gates) ? plan.gates.filter((gate) => gate.requerido !== false) : [];
-  const cubiertos = requeridos.filter((gate) => evidenciaParaGate(gate, evidencias)).length;
+  const cubiertos = requeridos.filter((gate) => evidenciaParaGate(gate, listaEvidencias, workspace)).length;
   const coberturaGates = requeridos.length ? cubiertos / requeridos.length : 1;
   const completo = plan?.estado === "completado" && errores.length === 0 && faltantes.length === 0 && pasosPendientes.length === 0;
   if (completo) advertencias.push("Estado completado respaldado por evidencia registrada.");

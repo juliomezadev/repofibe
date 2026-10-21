@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "fuente": "plantillas/preambulo.md",
+  "comando": "node <RAIZ>/nucleo/estado.mjs registrar <skill> \"<resultado en una linea>\"",
+  "politica": {
+    "contexto": {
+      "MUST_REGISTER": ["guardar", "aplanar"],
+      "MAY_REGISTER": [],
+      "MUST_NOT_REGISTER": ["restaurar"]
+    },
+    "memoria": {
+      "MUST_REGISTER": ["agregar", "olvidar", "exportar"],
+      "MAY_REGISTER": ["podar"],
+      "MUST_NOT_REGISTER": ["buscar", "listar"]
+    },
+    "pruebas-afectadas": {
+      "MUST_REGISTER": [],
+      "MAY_REGISTER": [],
+      "MUST_NOT_REGISTER": ["afectadas"]
+    },
+    "qaonline": {
+      "MUST_REGISTER": ["ejecutar"],
+      "MAY_REGISTER": ["configurar-sesion"],
+      "MUST_NOT_REGISTER": []
+    },
+    "ubicar": {
+      "MUST_REGISTER": [],
+      "MAY_REGISTER": ["hallazgo-no-obvio"],
+      "MUST_NOT_REGISTER": ["consulta"]
+    }
+  }
+}

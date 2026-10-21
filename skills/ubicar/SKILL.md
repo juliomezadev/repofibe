@@ -63,3 +63,10 @@ objetivo confirmado.
 - **Registra el hallazgo no obvio**: si algo vive en un lugar sorprendente,
   `node <RAIZ>/nucleo/memoria.mjs agregar aprendizaje "X vive en <ruta> porque ___"`
   — la próxima búsqueda será instantánea.
+
+## Contrato de cierre
+
+La fuente operativa es `plantillas/contrato-cierre.json`, entrada `ubicar`:
+`consulta` es `MUST_NOT_REGISTER` porque esta skill sólo localiza; un
+hallazgo no obvio es `MAY_REGISTER` y puede guardarse como aprendizaje si
+realmente aporta una convención reutilizable.

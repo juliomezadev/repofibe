@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // navegador.mjs — ojos reales para /qa y /diseno, sin gstack.
 //
-// Playwright NO es dependencia de repofibe (que sigue siendo cero-deps):
-// se importa dinámicamente y, si no está instalado en el proyecto, el
-// error explica cómo instalarlo — el mismo patrón que /grafo usa con
-// graphify (herramienta externa opcional, nunca embebida).
+// Playwright es dependencia de desarrollo para las pruebas de navegador:
+// se importa dinámicamente para que el núcleo siga funcionando sin ella, y
+// el error explica cómo preparar el checkout (`npm ci` + Chromium local).
 //
 // Sistema de refs: propio, sobre el texto público de page.ariaSnapshot()
 // (la API interna que genera refs no está expuesta en el paquete público
@@ -37,8 +36,8 @@ async function cargarPlaywright() {
   } catch {
     throw new Error(
       "Playwright no está instalado en este proyecto. Instálalo con:\n" +
-      "  npm install playwright && npx playwright install chromium\n" +
-      "(repofibe no lo empaqueta — sigue siendo cero-dependencias)."
+      "  npm ci && npm run setup:chromium\n" +
+      "(Playwright es dependencia de desarrollo; el núcleo no la requiere)."
     );
   }
 }
@@ -98,25 +97,17 @@ async function localizador(page, refs, ref) {
 }
 
 // Ejecutor unificado (try/catch a nivel de comando para modo daemon seguro)
-async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase) {
+async function ejecutarComandoInseguroBase(accion, sesion, refs, dirBase) {
+  const page = sesion.page;
+  const browser = sesion.browser;
   const inicio = Date.now();
   let res = null;
 
   switch (accion.accion) {
     case "perfil": {
       const state = cargarAuth(accion.dominio, dirBase);
-      if (state && state.cookies) {
-        await page.context().addCookies(state.cookies);
-      }
-      if (state && state.origins) {
-        for (const origin of state.origins) {
-          for (const item of origin.localStorage || []) {
-            try {
-              await page.evaluate(({ k, v }) => localStorage.setItem(k, v), { k: item.name, v: item.value });
-            } catch (e) {}
-          }
-        }
-      }
+      if (!state) throw new Error(`No hay storageState para ${accion.dominio} — ejecuta: node <RAIZ>/nucleo/cookies.mjs guardar ${accion.dominio}`);
+      await sesion.reemplazarContexto(state);
       // Reportar CUÁNTO se inyectó, no solo que la acción no lanzó. Antes
       // devolvía `ok: true` a secas: un perfil vacío era indistinguible de uno
       // cargado, y quien dependiera de la sesión autenticada se enteraba más
@@ -124,7 +115,7 @@ async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase)
       // módulo nunca lo publicaba, así que la aserción comparaba undefined.
       const nCookies = state?.cookies?.length ?? 0;
       const nOrigins = state?.origins?.length ?? 0;
-      res = { accion: "perfil", ok: true, dominio: accion.dominio, cookies: nCookies, origins: nOrigins };
+      res = { accion: "perfil", ok: true, dominio: accion.dominio, cookies: nCookies, origins: nOrigins, url: "about:blank" };
       break;
     }
     case "exportarPerfil": {
@@ -199,45 +190,108 @@ async function ejecutarComandoInseguroBase(accion, page, browser, refs, dirBase)
       res = { accion: accion.accion, ok: false, error: `acción desconocida: ${accion.accion}` };
   }
 
-  if (res && page && !res.url) {
-    try { res.url = page.url(); } catch (e) {}
+  if (res && sesion.page && !res.url) {
+    try { res.url = sesion.page.url(); } catch (e) {}
   }
   return res;
 }
 
-const ejecutarComandoInseguro = async (accion, page, browser, refs, dirBase) => {
+const ejecutarComandoInseguro = async (accion, sesion, refs, dirBase) => {
   const fn = withTrace(`Navegador: ${accion.accion}`, ejecutarComandoInseguroBase);
-  return fn(accion, page, browser, refs, dirBase);
+  return fn(accion, sesion, refs, dirBase);
 };
 
-export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
+async function nuevoContexto(browser, timeoutMs, storageState = undefined) {
+  const context = await browser.newContext(storageState ? { storageState } : {});
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(timeoutMs);
+    return { context, page };
+  } catch (error) {
+    try { await context.close(); } catch {}
+    throw error;
+  }
+}
+
+function vaciarRefs(refs) {
+  for (const clave of Object.keys(refs)) delete refs[clave];
+}
+
+// Una sesión explícita mantiene el mismo browser, contexto, page y mapa de
+// refs durante una secuencia. No hay singleton global: cada consumidor decide
+// cuándo abrir y cerrar su propia sesión.
+export async function crearSesionNavegador({
+  headless = true,
+  timeoutMs = 15000,
+  dirBase = undefined,
+  accionesIniciales = [],
+} = {}) {
   const { chromium } = await cargarPlaywright();
 
-  // La validación del perfil va ANTES de lanzar Chromium. Antes se lanzaba
-  // primero y el `throw` salía sin cerrarlo: el proceso del navegador quedaba
-  // huérfano manteniendo vivo el event loop, y el comando se colgaba para
-  // siempre en vez de fallar. Un script con `perfil` sobre un dominio sin
-  // sesión guardada colgaba la sesión entera (encontrado el 2026-07-25, al
-  // ejecutar por primera vez con Chromium instalado).
-  let ctxOpts = {};
-  const perfilAccion = acciones.find((a) => a.accion === "perfil");
-  if (perfilAccion) {
-    const state = cargarAuth(perfilAccion.dominio, dirBase);
+  // Validar perfiles antes de lanzar Chromium evita procesos huérfanos si un
+  // script referencia una sesión inexistente o un origen distinto.
+  let storageStateInicial;
+  for (const accion of accionesIniciales.filter((item) => item.accion === "perfil")) {
+    const state = cargarAuth(accion.dominio, dirBase);
     if (!state) {
-      throw new Error(`No hay storageState para ${perfilAccion.dominio} — ejecuta: node <RAIZ>/nucleo/cookies.mjs guardar ${perfilAccion.dominio}`);
+      throw new Error(`No hay storageState para ${accion.dominio} — ejecuta: node <RAIZ>/nucleo/cookies.mjs guardar ${accion.dominio}`);
     }
-    ctxOpts = { storageState: state };
+    // Mantener la semántica histórica de accionesIniciales para clientes que
+    // construyen la sesión manualmente y ejecutan solo el resto del flujo.
+    if (storageStateInicial === undefined) storageStateInicial = state;
   }
 
   const browser = await chromium.launch({ headless });
-  const page = await browser.newPage(ctxOpts);
-  page.setDefaultTimeout(timeoutMs);
-  let refs = {};
+  let context = null;
+  let page = null;
+  const refs = {};
+  let cerrada = false;
+  try {
+    ({ context, page } = await nuevoContexto(browser, timeoutMs, storageStateInicial));
+    const sesion = {
+      browser,
+      get context() { return context; },
+      get page() { return page; },
+      reemplazarContexto: async (storageState) => {
+        const siguiente = await nuevoContexto(browser, timeoutMs, storageState);
+        const anterior = context;
+        context = siguiente.context;
+        page = siguiente.page;
+        vaciarRefs(refs);
+        if (anterior) {
+          try { await anterior.close(); } catch { /* el contexto anterior pudo cerrarse */ }
+        }
+      },
+    };
+    return {
+      browser,
+      get context() { return context; },
+      get page() { return page; },
+      refs,
+      get cerrada() { return cerrada; },
+      ejecutar: (accion) => ejecutarComandoInseguro(accion, sesion, refs, dirBase),
+      cerrar: async () => {
+        if (cerrada) return;
+        cerrada = true;
+        try { if (context) await context.close(); } finally { await browser.close(); }
+      },
+    };
+  } catch (e) {
+    try { await browser.close(); } catch {}
+    throw e;
+  }
+}
+
+export async function ejecutarScript(acciones, opciones = {}) {
+  const session = await crearSesionNavegador({
+    ...opciones,
+    accionesIniciales: acciones,
+  });
   const resultados = [];
   try {
     for (const accion of acciones) {
       try {
-        const r = await ejecutarComandoInseguro(accion, page, browser, refs, dirBase);
+        const r = await session.ejecutar(accion);
         resultados.push(r);
         if (!r.ok) break; // one-shot detiene en error
       } catch (e) {
@@ -246,7 +300,7 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
       }
     }
   } finally {
-    await browser.close();
+    await session.cerrar();
   }
   return resultados;
 }
@@ -254,16 +308,37 @@ export async function ejecutarScript(acciones, { headless = true, timeoutMs = 15
 export async function ejecutarDaemon({ headless = true, timeoutMs = 15000, dirBase = undefined } = {}) {
   const { chromium } = await cargarPlaywright();
   const browser = await chromium.launch({ headless });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.setDefaultTimeout(timeoutMs);
-  let refs = {};
+  let context = null;
+  let page = null;
+  const refs = {};
+  try {
+    ({ context, page } = await nuevoContexto(browser, timeoutMs));
+  } catch (error) {
+    try { await browser.close(); } catch {}
+    throw error;
+  }
+  const sesion = {
+    browser,
+    get context() { return context; },
+    get page() { return page; },
+    reemplazarContexto: async (storageState) => {
+      const siguiente = await nuevoContexto(browser, timeoutMs, storageState);
+      const anterior = context;
+      context = siguiente.context;
+      page = siguiente.page;
+      vaciarRefs(refs);
+      if (anterior) {
+        try { await anterior.close(); } catch { /* el contexto anterior pudo cerrarse */ }
+      }
+    },
+  };
   
   // Apocalipsis Zombie Defense
   let muerto = false;
   const morir = async () => {
     if (muerto) return;
     muerto = true;
+    try { if (context) await context.close(); } catch {}
     try { await browser.close(); } catch {}
     process.exit(0);
   };
@@ -299,7 +374,7 @@ export async function ejecutarDaemon({ headless = true, timeoutMs = 15000, dirBa
       }
 
       try {
-        const resultado = await ejecutarComandoInseguro(comando, page, browser, refs, dirBase);
+        const resultado = await ejecutarComandoInseguro(comando, sesion, refs, dirBase);
         resultado.msgId = comando.msgId; // Correlación obligatoria
         console.log(JSON.stringify(resultado));
       } catch (e) {
@@ -314,7 +389,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const [cmd, ...args] = process.argv.slice(2);
   
   if (cmd === "daemon") {
-    ejecutarDaemon().catch(e => {
+    ejecutarDaemon({ dirBase: process.env.REPOFIBE_DIR }).catch(e => {
       console.error(JSON.stringify({ status: "fatal", error: e.message }));
       process.exit(1);
     });
@@ -329,7 +404,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     try { acciones = JSON.parse(crudo); } catch (e) { console.error(`Script inválido (no es JSON): ${e.message}`); process.exit(1); }
     if (!Array.isArray(acciones)) { console.error("El script debe ser un array de acciones."); process.exit(1); }
 
-    ejecutarScript(acciones).then(resultados => {
+    ejecutarScript(acciones, { dirBase: process.env.REPOFIBE_DIR }).then(resultados => {
       console.log(JSON.stringify(resultados, null, 2));
       process.exit(resultados.some((r) => !r.ok) ? 1 : 0);
     }).catch(e => {

@@ -2,16 +2,134 @@
 // sync.mjs — sincronización de memoria entre máquinas via git con 3-Way Merge Driver
 
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL, fileURLToPath } from "node:url";
+import { conBloqueoExclusivoSync, escribirAtomicoSync } from "./persistencia.mjs";
 
-const CONFIG_FILE = join(homedir(), ".repofibe", "sync-config.json");
-const DIR_SYNC = join(homedir(), ".repofibe", "sync-repo");
+const SYNC_HOME = process.env.REPOFIBE_SYNC_HOME || homedir();
+const DIR_REPOFIBE = join(SYNC_HOME, ".repofibe");
+const CONFIG_FILE = join(DIR_REPOFIBE, "sync-config.json");
+const DIR_SYNC = join(DIR_REPOFIBE, "sync-repo");
+
+function lstatOpcional(path) {
+  try { return lstatSync(path); }
+  catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+function exigirDirectorioReal(path, etiqueta, opcional = false) {
+  const info = lstatOpcional(path);
+  if (!info && opcional) return false;
+  if (!info || info.isSymbolicLink() || !info.isDirectory()) {
+    throw new Error(`Sync seguro: ${etiqueta} debe ser un directorio real, sin symlinks ni junctions.`);
+  }
+  return true;
+}
+
+function exigirArchivoJsonlSeguro(path, etiqueta, opcional = false) {
+  const info = lstatOpcional(path);
+  if (!info && opcional) return false;
+  if (!info || info.isSymbolicLink() || !info.isFile()) {
+    throw new Error(`Sync seguro: ${etiqueta} debe ser un archivo regular, sin symlinks.`);
+  }
+  return true;
+}
+
+function validarArbolRepoSync() {
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
+  const dirFabrica = join(DIR_SYNC, "fabrica");
+  if (!exigirDirectorioReal(dirFabrica, "fabrica del espejo", true)) return false;
+  for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
+    exigirArchivoJsonlSeguro(join(dirFabrica, arch), `fabrica/${arch}`, true);
+  }
+  return true;
+}
 
 function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
+}
+
+function clonarRepoSync(repo) {
+  // El override debe aplicarse durante el checkout inicial, antes de persistirlo
+  // en .git/config; cambiarlo después deja el JSONL con CRLF y el índice sucio.
+  git(["-c", "core.autocrlf=false", "clone", repo, DIR_SYNC]);
+}
+
+function gitBytes(args) {
+  return execFileSync("git", args, { env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function configurarRepoSync() {
+  validarArbolRepoSync();
+  // Convierte solo checkouts cuya única diferencia sea CRLF de autocrlf; una
+  // edición real en el espejo se conserva y detiene el sync para evitar pérdida.
+  const rutas = git(["-C", DIR_SYNC, "ls-files", "--", "fabrica/memoria.jsonl", "fabrica/dominio-notas.jsonl"])
+    .split("\n").filter(Boolean);
+  const staged = rutas.length
+    ? git(["-C", DIR_SYNC, "diff", "--cached", "--name-only", "HEAD", "--", ...rutas]).trim()
+    : "";
+  if (staged) throw new Error(`Sync espejo con cambios staged en ${staged}; no se normalizan datos locales.`);
+
+  const normalizar = [];
+  for (const ruta of rutas) {
+    const path = join(DIR_SYNC, ruta);
+    exigirArchivoJsonlSeguro(path, `fabrica/${ruta}`);
+    let head;
+    try { head = gitBytes(["-C", DIR_SYNC, "show", `HEAD:${ruta}`]); }
+    catch { throw new Error(`Sync espejo sin blob HEAD para ${ruta}; no se normalizan datos locales.`); }
+    const actual = readFileSync(path);
+    if (actual.equals(head)) continue;
+    const crlf = Buffer.from(head.toString("utf8").replace(/\r?\n/g, "\r\n"), "utf8");
+    if (!actual.equals(crlf)) {
+      throw new Error(`Sync espejo con cambios locales fuera de finales de línea en ${ruta}; no se normalizan datos locales.`);
+    }
+    normalizar.push([path, head]);
+  }
+
+  // Este espejo transporta líneas JSONL byte a byte; autocrlf alteraría los
+  // terminadores del checkout y haría que el merge las interpretara como nuevas.
+  git(["-C", DIR_SYNC, "config", "core.autocrlf", "false"]);
+  for (const [path, bytes] of normalizar) {
+    validarArbolRepoSync();
+    exigirArchivoJsonlSeguro(path, path);
+    escribirAtomicoSync(path, bytes);
+  }
+}
+
+function textoErrorGit(error) {
+  return [error?.stderr, error?.stdout, error?.message]
+    .filter(Boolean)
+    .map((valor) => Buffer.isBuffer(valor) ? valor.toString("utf8") : String(valor))
+    .join("\n");
+}
+
+export function clasificarErrorSync(error, { conflicto = false } = {}) {
+  const salida = textoErrorGit(error);
+  if (conflicto || /conflict|unmerged|merge failed/i.test(salida)) return "conflicto";
+  if (/repository .*not found|does not appear to be a git repository|no such remote|remote .*does not exist/i.test(salida)) return "remoto-inexistente";
+  if (/authentication failed|could not read from remote|permission denied|access denied|invalid username|terminal prompts disabled/i.test(salida)) return "autenticacion";
+  if (/could not resolve host|connection .*failed|connection timed out|timed out|network is unreachable|unable to access/i.test(salida)) return "red";
+  return "error-git";
+}
+
+function errorSync(codigo, error) {
+  const fallo = new Error(`Sync pull falló (${codigo}): ${textoErrorGit(error).trim() || "git devolvió un error"}`);
+  fallo.codigo = codigo;
+  fallo.syncSuccess = false;
+  fallo.causa = error;
+  return fallo;
+}
+
+function commitActual() {
+  try { return git(["-C", DIR_SYNC, "rev-parse", "HEAD"]).trim(); }
+  catch { return null; }
+}
+
+function tieneConflictos() {
+  try { return Boolean(git(["-C", DIR_SYNC, "diff", "--name-only", "--diff-filter=U"]).trim()); }
+  catch { return false; }
 }
 
 function cargarConfig() {
@@ -20,57 +138,61 @@ function cargarConfig() {
 }
 
 function guardarConfig(config) {
-  mkdirSync(join(homedir(), ".repofibe"), { recursive: true });
+  mkdirSync(join(SYNC_HOME, ".repofibe"), { recursive: true });
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+}
+
+function leerLineasJsonl(ruta) {
+  if (!existsSync(ruta)) return [];
+  const texto = readFileSync(ruta, "utf8");
+  if (texto === "") return [];
+  const lineas = texto.split("\n");
+  if (texto.endsWith("\n")) lineas.pop(); // quita solo el terminador final, no líneas internas
+  lineas.forEach((linea, indice) => {
+    try { JSON.parse(linea); }
+    catch (error) { throw new Error(`JSONL inválido en ${ruta}, línea ${indice + 1}: ${error.message}`); }
+  });
+  return lineas;
+}
+
+function serializarLineasJsonl(lineas) {
+  return lineas.length ? lineas.join("\n") + "\n" : "";
 }
 
 // 3-Way Merge Driver para Git (%O ancestro, %A local, %B remoto)
 export function gitMerge3Way(ancestorPath, localPath, remotePath) {
   try {
-    // parsear NO muta el contenido: devuelve las líneas ORIGINALES intactas.
-    // La normalización de separadores (\ → /) se usa SOLO como clave de
-    // comparación para deduplicar entre máquinas (Windows vs Unix). Aplicarla
-    // al contenido escrito corrompía rutas, regex y escapes en cada merge.
-    const clave = (l) => l.replaceAll("\\", "/");
-    const parsear = (p) => {
-      if (!existsSync(p)) return [];
-      const txt = readFileSync(p, "utf8");
-      if (!txt.trim()) return [];
-      return txt.split("\n").filter(Boolean).map((l) => {
-        if (l.trim().startsWith("{")) JSON.parse(l); // valida, no muta
-        return l;
-      });
-    };
+    return conBloqueoExclusivoSync(`${localPath}.lock`, () => {
+      // Cada línea JSONL se valida antes de escribir y se compara exactamente;
+      // las barras y escapes son parte de los datos, nunca claves normalizadas.
+      const loc = leerLineasJsonl(localPath);
+      const rem = leerLineasJsonl(remotePath);
+      const anc = ancestorPath ? leerLineasJsonl(ancestorPath) : [];
 
-    const loc = parsear(localPath);
-    const rem = parsear(remotePath);
-    const anc = (ancestorPath && existsSync(ancestorPath)) ? parsear(ancestorPath) : [];
+      const ancSet = new Set(anc);
+      const locSet = new Set(loc);
+      const remSet = new Set(rem);
 
-    const ancSet = new Set(anc.map(clave));
-    const locSet = new Set(loc.map(clave));
-    const remSet = new Set(rem.map(clave));
+      const resultado = [];
+      const procesados = new Set();
 
-    const resultado = [];
-    const procesados = new Set();
-
-    // 1. Entradas de local (mantener si no fueron eliminadas en remoto o fueron creadas en local)
-    for (const l of loc) {
-      const k = clave(l);
-      if (!ancSet.has(k) || remSet.has(k)) {
-        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
+      // 1. Entradas de local (mantener si no fueron eliminadas en remoto o fueron creadas en local)
+      for (const linea of loc) {
+        if (!ancSet.has(linea) || remSet.has(linea)) {
+          if (!procesados.has(linea)) { resultado.push(linea); procesados.add(linea); }
+        }
       }
-    }
 
-    // 2. Entradas de remoto (mantener si no fueron eliminadas en local o fueron creadas en remoto)
-    for (const l of rem) {
-      const k = clave(l);
-      if (!ancSet.has(k) || locSet.has(k)) {
-        if (!procesados.has(k)) { resultado.push(l); procesados.add(k); }
+      // 2. Entradas de remoto (mantener si no fueron eliminadas en local o fueron creadas en remoto)
+      for (const linea of rem) {
+        if (!ancSet.has(linea) || locSet.has(linea)) {
+          if (!procesados.has(linea)) { resultado.push(linea); procesados.add(linea); }
+        }
       }
-    }
 
-    writeFileSync(localPath, resultado.length ? resultado.join("\n") + "\n" : "");
-    return true;
+      escribirAtomicoSync(localPath, serializarLineasJsonl(resultado));
+      return true;
+    });
   } catch (e) {
     console.error("Error en 3-Way Merge Driver:", e.message);
     return false;
@@ -80,19 +202,22 @@ export function gitMerge3Way(ancestorPath, localPath, remotePath) {
 // Merge 2-Way append-only (fallback)
 export function mergeJsonl(destPath, srcPath) {
   if (!existsSync(srcPath)) return 0;
-  const remotas = readFileSync(srcPath, "utf8").split("\n").filter(Boolean).map(l => l.replaceAll("\\", "/"));
-  if (!existsSync(destPath)) {
-    writeFileSync(destPath, remotas.length ? remotas.join("\n") + "\n" : "");
-    return remotas.length;
-  }
-  const locales = new Set(readFileSync(destPath, "utf8").split("\n").filter(Boolean).map(l => l.replaceAll("\\", "/")));
-  const nuevas = remotas.filter((l) => !locales.has(l));
-  if (nuevas.length) {
-    const actual = readFileSync(destPath, "utf8");
-    const sep = actual === "" || actual.endsWith("\n") ? "" : "\n";
-    appendFileSync(destPath, sep + nuevas.join("\n") + "\n");
-  }
-  return nuevas.length;
+  return conBloqueoExclusivoSync(`${destPath}.lock`, () => {
+    // Lee y valida ambos documentos bajo el mismo lock antes de reemplazar el
+    // destino; un origen inválido no puede dejar un append parcial.
+    const remotas = leerLineasJsonl(srcPath);
+    const locales = leerLineasJsonl(destPath);
+    const vistas = new Set(locales);
+    const nuevas = [];
+    for (const linea of remotas) {
+      if (!vistas.has(linea)) {
+        vistas.add(linea);
+        nuevas.push(linea);
+      }
+    }
+    if (nuevas.length) escribirAtomicoSync(destPath, serializarLineasJsonl([...locales, ...nuevas]));
+    return nuevas.length;
+  });
 }
 
 export async function escanearSecretos(dirFabrica) {
@@ -101,33 +226,16 @@ export async function escanearSecretos(dirFabrica) {
   let encontrados = 0;
   for (const arch of archivos) {
     const ruta = join(dirFabrica, arch);
-    if (!existsSync(ruta)) continue;
-    const contenido = readFileSync(ruta, "utf8");
-    const resultado = redactar(contenido);
-    if (resultado.hallazgos.length > 0) {
-      writeFileSync(ruta, resultado.texto);
-      encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
-    }
-  }
-  const authDir = join(dirFabrica, "auth");
-  if (existsSync(authDir)) {
-    for (const arch of readdirSyncList(authDir)) {
-      if (!arch.endsWith(".json")) continue;
-      const ruta = join(authDir, arch);
+    encontrados += conBloqueoExclusivoSync(`${ruta}.lock`, () => {
+      if (!existsSync(ruta)) return 0;
       const contenido = readFileSync(ruta, "utf8");
       const resultado = redactar(contenido);
-      if (resultado.hallazgos.length > 0) {
-        writeFileSync(ruta, resultado.texto);
-        encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
-      }
-    }
+      if (!resultado.hallazgos.length) return 0;
+      escribirAtomicoSync(ruta, resultado.texto);
+      return resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
+    });
   }
   return encontrados;
-}
-
-function readdirSyncList(dir) {
-  try { return readdirSync(dir); }
-  catch { return []; }
 }
 
 export async function push(dirFabrica) {
@@ -139,32 +247,39 @@ export async function push(dirFabrica) {
     console.log(`⚠️ Se redactaron ${secretos} posibles secretos en .fabrica/ antes de push.`);
   }
 
-  if (!existsSync(DIR_SYNC)) {
-    git(["clone", config.repo, DIR_SYNC]);
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  if (!lstatOpcional(DIR_SYNC)) {
+    clonarRepoSync(config.repo);
+  } else {
+    exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
   }
+  configurarRepoSync();
 
   const syncFabrica = join(DIR_SYNC, "fabrica");
-  mkdirSync(syncFabrica, { recursive: true });
+  if (!exigirDirectorioReal(syncFabrica, "fabrica del espejo", true)) mkdirSync(syncFabrica);
+  exigirDirectorioReal(syncFabrica, "fabrica del espejo");
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
     const src = join(dirFabrica, arch);
+    const dest = join(syncFabrica, arch);
+    exigirArchivoJsonlSeguro(dest, `fabrica/${arch}`, true);
     if (existsSync(src)) {
-      writeFileSync(join(syncFabrica, arch), readFileSync(src, "utf8"));
+      escribirAtomicoSync(dest, readFileSync(src, "utf8"));
+      exigirArchivoJsonlSeguro(dest, `fabrica/${arch}`);
     }
   }
+  validarArbolRepoSync();
 
-  const authDir = join(dirFabrica, "auth");
-  const syncAuthDir = join(syncFabrica, "auth");
-  if (existsSync(authDir)) {
-    mkdirSync(syncAuthDir, { recursive: true });
-    for (const arch of readdirSyncList(authDir)) {
-      if (arch.endsWith(".json") && !arch.startsWith("perfil")) {
-        writeFileSync(join(syncAuthDir, arch), readFileSync(join(authDir, arch), "utf8"));
-      }
-    }
+  // Auth nunca entra al Ã­ndice: contiene cookies, storageState y sesiones
+  // locales. El reset evita que una copia histÃ³rica de fabrica/auth/ oculte
+  // una modificaciÃ³n accidental al usar `git add -A`.
+  try { git(["-C", DIR_SYNC, "reset", "--", "fabrica/auth"]); } catch {}
+  const permitidos = ["memoria.jsonl", "dominio-notas.jsonl"]
+    .filter((arch) => exigirArchivoJsonlSeguro(join(syncFabrica, arch), `fabrica/${arch}`, true))
+    .map((arch) => `fabrica/${arch}`);
+  if (permitidos.length) {
+    try { git(["-C", DIR_SYNC, "add", "-A", "--", ...permitidos]); } catch {}
   }
-
-  try { git(["-C", DIR_SYNC, "add", "-A"]); } catch {}
   try {
     git(["-C", DIR_SYNC, "commit", "-m", `sync push: ${new Date().toISOString()}`]);
     git(["-C", DIR_SYNC, "push"]);
@@ -185,20 +300,33 @@ export async function pull(dirFabrica) {
   const config = cargarConfig();
   if (!config) throw new Error("No hay repo de sync configurado — ejecuta: sync.mjs configurar <url-repo-git-privado>");
 
-  if (!existsSync(DIR_SYNC)) {
-    git(["clone", config.repo, DIR_SYNC]);
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  if (!lstatOpcional(DIR_SYNC)) {
+    try {
+      clonarRepoSync(config.repo);
+    } catch (e) {
+      throw errorSync(clasificarErrorSync(e), e);
+    }
+  } else {
+    exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
   }
+  configurarRepoSync();
 
+  const commitAntes = commitActual();
   try {
-    git(["-C", DIR_SYNC, "pull", "--quiet"]);
+    git(["-C", DIR_SYNC, "pull", "--no-rebase", "--quiet"]);
   } catch (e) {
-    console.log("Auto-resolviendo pull de sync...");
+    const conflicto = tieneConflictos();
+    throw errorSync(clasificarErrorSync(e, { conflicto }), e);
   }
+  const commitDespues = commitActual();
+  const resultadoPull = commitAntes && commitAntes === commitDespues ? "sin-cambios" : "actualizado";
 
+  const hayFabrica = validarArbolRepoSync();
   const syncFabrica = join(DIR_SYNC, "fabrica");
-  if (!existsSync(syncFabrica)) {
+  if (!hayFabrica) {
     console.log("Repo de sync vacío — sin cambios para traer.");
-    return;
+    return { ok: true, estado: resultadoPull };
   }
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
@@ -206,18 +334,8 @@ export async function pull(dirFabrica) {
     if (n > 0) console.log(`${arch}: ${n} entradas nuevas sincronizadas.`);
   }
 
-  const syncAuthDir = join(syncFabrica, "auth");
-  const localAuthDir = join(dirFabrica, "auth");
-  if (existsSync(syncAuthDir)) {
-    mkdirSync(localAuthDir, { recursive: true });
-    for (const arch of readdirSyncList(syncAuthDir)) {
-      if (arch.endsWith(".json") && !arch.startsWith("perfil")) {
-        writeFileSync(join(localAuthDir, arch), readFileSync(join(syncAuthDir, arch), "utf8"));
-      }
-    }
-  }
-
-  console.log("✅ Cambios sincronizados.");
+  console.log(resultadoPull === "sin-cambios" ? "✅ Sync ya estaba actualizado." : "✅ Cambios sincronizados.");
+  return { ok: true, estado: resultadoPull };
 }
 
 export function configurar(repoUrl) {

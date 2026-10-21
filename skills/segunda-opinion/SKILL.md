@@ -52,6 +52,10 @@ porque no lo es.
    ```
    Si el resumen en stderr reporta hallazgos, usa la SALIDA redactada (no el
    diff original) y dilo explícitamente en tu mensaje al otro modelo.
+   El escáner reconoce asignaciones comunes también en objetos JSON y registros
+   JSONL, y conserva sus delimitadores al sustituir el valor. Es una detección
+   de patrones de alta confianza, no una garantía de que cualquier secreto
+   quede detectado: revisa manualmente el material antes de enviarlo.
 2. Invoca el CLI en modo no-interactivo con un prompt en español que exige:
    hallazgos con archivo:línea, escenario concreto de fallo, severidad, y
    veredicto final PASA/NO-PASA (modo revision).

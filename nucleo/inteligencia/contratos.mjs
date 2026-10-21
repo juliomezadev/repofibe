@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { MODOS, normalizarModo } from "./modos.mjs";
 
 export const VERSION_CONTRATO = 1;
+export const VERSION_EVIDENCIA = 2;
 export const ESTADOS_PLAN = Object.freeze(["propuesto", "en_curso", "bloqueado", "completado", "cancelado"]);
 export const TIPOS_EVIDENCIA = Object.freeze(["comando", "prueba", "inspeccion", "aprobacion", "revision", "resultado"]);
 export const NIVELES_CONFIANZA = Object.freeze(["baja", "media", "alta"]);
@@ -114,9 +115,11 @@ export function crearEvidencia({
   archivos = [],
   confianza = "media",
   timestamp = ahora(),
+  procedencia = "declarada",
+  ejecucionRef = null,
 } = {}) {
   const evidencia = {
-    version: VERSION_CONTRATO,
+    version: VERSION_EVIDENCIA,
     id: textoObligatorio(id, "id"),
     gateId: gateId === null ? null : textoObligatorio(gateId, "gateId"),
     tipo,
@@ -127,6 +130,8 @@ export function crearEvidencia({
     archivos: listaStrings(archivos, "archivos"),
     confianza,
     timestamp,
+    procedencia,
+    ejecucionRef,
   };
   const validacion = validarEvidencia(evidencia);
   if (!validacion.valido) throw new Error(validacion.errores.join("; "));
@@ -169,6 +174,7 @@ export function validarPlan(plan) {
   if (Array.isArray(plan.gates)) plan.gates.forEach((gate, indice) => {
     if (!esObjeto(gate) || typeof gate.id !== "string" || !gate.id.trim()) errores.push(`gate ${indice + 1} sin id`);
     if (!esObjeto(gate) || typeof gate.descripcion !== "string" || !gate.descripcion.trim()) errores.push(`gate ${indice + 1} sin descripción`);
+    if (esObjeto(gate) && !TIPOS_EVIDENCIA.includes(gate.tipo ?? "resultado")) errores.push(`gate ${indice + 1} tiene tipo inválido`);
   });
   return { valido: errores.length === 0, errores };
 }
@@ -176,7 +182,7 @@ export function validarPlan(plan) {
 export function validarEvidencia(evidencia) {
   const errores = [];
   if (!esObjeto(evidencia)) return { valido: false, errores: ["evidencia debe ser un objeto"] };
-  if (evidencia.version !== VERSION_CONTRATO) errores.push("versión de evidencia inválida");
+  if (![1, VERSION_EVIDENCIA].includes(evidencia.version)) errores.push("versión de evidencia inválida");
   if (typeof evidencia.id !== "string" || !evidencia.id.trim()) errores.push("evidencia.id es obligatorio");
   if (!TIPOS_EVIDENCIA.includes(evidencia.tipo)) errores.push("evidencia.tipo inválido");
   if (typeof evidencia.fuente !== "string" || !evidencia.fuente.trim()) errores.push("evidencia.fuente es obligatoria");
@@ -186,6 +192,21 @@ export function validarEvidencia(evidencia) {
   if (!Array.isArray(evidencia.archivos)) errores.push("evidencia.archivos debe ser una lista");
   if (!NIVELES_CONFIANZA.includes(evidencia.confianza)) errores.push("evidencia.confianza inválida");
   if (typeof evidencia.timestamp !== "string" || !evidencia.timestamp.trim()) errores.push("evidencia.timestamp es obligatorio");
+  if (evidencia.version === VERSION_EVIDENCIA) {
+    if (!["declarada", "observada"].includes(evidencia.procedencia)) errores.push("evidencia.procedencia inválida");
+    if (evidencia.ejecucionRef !== null && evidencia.ejecucionRef !== undefined) {
+      const referencia = evidencia.ejecucionRef;
+      if (!esObjeto(referencia) || typeof referencia.runId !== "string" || !referencia.runId.trim() ||
+          typeof referencia.sha256Recibo !== "string" || !/^[a-f0-9]{64}$/i.test(referencia.sha256Recibo) ||
+          (referencia.argsSha256 !== undefined && (typeof referencia.argsSha256 !== "string" || !/^[a-f0-9]{64}$/i.test(referencia.argsSha256)))) {
+        errores.push("evidencia.ejecucionRef inválida");
+      }
+    }
+      if (evidencia.procedencia === "observada" && evidencia.tipo === "prueba" &&
+          (!evidencia.ejecucionRef || !/^[a-f0-9]{64}$/i.test(evidencia.ejecucionRef.argsSha256 ?? ""))) {
+        errores.push("evidencia de prueba observada requiere ejecucionRef con argsSha256");
+    }
+  }
   return { valido: errores.length === 0, errores };
 }
 

@@ -32,19 +32,24 @@ retar un plan, cuándo parar.
 
 ### Plugin nativo / copias planas, nunca symlinks
 
-gstack instala con `git clone` + symlinks y en Windows sin Developer Mode
-degrada a copias congeladas que exigen re-ejecutar setup tras cada pull. 
-repofibe elimina la clase de bug: en Claude Code es un plugin nativo (el
-harness gestiona carga, hooks y actualizaciones); en el resto de hosts son
-copias planas idempotentes — reinstalar ES actualizar. `~/.repofibe/instalado.json`
-registra cada ruta escrita, así la desinstalación es exacta, no heurística.
+repofibe evita depender de symlinks para distribuir skills: usa un plugin
+nativo de Claude Code cuando la CLI puede confirmar el registro y copias planas
+en los demás hosts o como fallback. Para Claude Code, el fallback registra los
+hooks en `~/.claude/settings.json`. La CLI del plugin confirma que el plugin
+quedó registrado, pero el diagnóstico no puede demostrar que el host lo haya
+cargado; lo marca `registrado_no_verificado`. No se debe confundir registro con
+activación observada. `~/.repofibe/instalado.json` guarda rutas y hashes de los
+archivos propios para distinguirlos de archivos ajenos o editados por el
+usuario.
 
-### Node puro, cero dependencias
+### Node con runtime mínimo y dependencias de QA reproducibles
 
 gstack necesita Bun + build de un binario de ~58MB, y en Windows tiene que
-caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa lo que
-ya está en todas partes: Node 18+ y `.mjs` sin `node_modules`. No hay build
-step, no hay binario desactualizado, no hay "funciona en mi Mac". El costo:
+caer de vuelta a Node por un bug de Bun con Playwright. repofibe usa Node 22 o
+superior (24 recomendado) y `.mjs`, sin dependencias externas en el runtime.
+Las pruebas de navegador fijan `playwright@1.64.1` como dependencia de
+desarrollo y preparan Chromium con `npm run setup:chromium`. No hay build step
+ni binario propio desactualizado. El costo:
 sin SQLite nativo — por eso la memoria es JSONL (que además es legible,
 versionable y a prueba de corrupción total).
 
@@ -84,8 +89,51 @@ reserva para el congelamiento, que el propio usuario activó.
 `guardia.mjs` de verdad contra un directorio temporal y verifica el protocolo
 completo del hook (JSON por stdin → decisión por stdout), la normalización de
 acentos en la búsqueda, y los falsos positivos conocidos
-(`--force-with-lease` no debe alertar). Tier 1 es gratis y corre en CI; los
-tiers con LLM (E2E, juez) llegan en v0.2/v0.3.
+(`--force-with-lease` no debe alertar). Tier 1 es gratis y corre en CI; Tier 2
+incluye una sesión E2E y la suite LLM se omite sin `ANTHROPIC_API_KEY`; una
+omisión no es un pase. El workflow actual prueba Ubuntu y Windows con Node 22 y
+24, y macOS con Node 24; macOS con Node 22 está excluido. Tier 1 instala
+Playwright y Chromium antes de correr. En sistemas que impiden crear symlinks o
+junctions, las evals pueden omitir esos fixtures y lo informan; esa plataforma
+no queda verificada para ese caso.
+
+### Recibos de ejecuciones de gates
+
+`nucleo/inteligencia/ejecuciones.mjs` guarda recibos bajo
+`.fabrica/ejecuciones/` con el gate, el comando, el commit y fingerprint de las
+fuentes observadas, el código de salida y hashes de logs que se persisten tras
+redacción. La evidencia hace referencia al recibo por `runId` y SHA-256; el
+verificador vuelve a comprobar recibo, logs y snapshot del workspace. El sync
+de `.fabrica/` sólo copia memoria y notas de dominio, no estos recibos.
+
+La garantía tiene límites: las detecciones de secretos son por patrones y no
+cubren todo formato posible; el runner hereda el entorno del proceso, ejecuta
+comandos sin un sandbox del sistema operativo y sólo bloquea algunas formas
+obvias de publicación. Los archivos locales y sus hashes no están firmados:
+quien puede escribir el workspace puede sustituir recibo, log y evidencia.
+Sirven para vincular una prueba observada con el estado local del código, no
+como atestación criptográfica ni como registro a prueba de manipulación.
+
+### Fallos de instalación y rollback
+
+El instalador toma copias de archivos y configuración antes de modificarlos y
+revierte los cambios locales si detecta un error. Para no borrar trabajo
+concurrente, omite restaurar una ruta que haya cambiado, se haya convertido en
+enlace o tenga padres inseguros; en esos casos informa que el rollback quedó
+incompleto. Los cambios hechos por la CLI de Claude se compensan aparte: sólo
+retira el marketplace que pudo confirmar como recién creado y sólo cuando la
+lista confirma que no quedan plugins asociados. Un fallo de la CLI de
+actualización puede dejar la app local ya refrescada y el plugin nativo por
+actualizar; hay que reintentar. Esta compensación no equivale a una transacción
+atómica entre repofibe y Claude Code.
+
+### Escáner experimental de cadena de suministro
+
+Los archivos locales no rastreados `hooks/antivirus-hook.mjs` y
+`nucleo/antivirus.mjs` fueron auditados en Batch 4 y rechazados: cubren
+indicadores concretos de paquetes y persistencia, pero no ofrecen cobertura
+general de contenido o binarios, tienen falsos positivos y no están cableados.
+No forman parte del producto ni deben describirse como un antivirus.
 
 ## Lo que intencionalmente NO está (todavía o nunca)
 
@@ -107,3 +155,8 @@ tiers con LLM (E2E, juez) llegan en v0.2/v0.3.
 - **MCP** — el estándar Agent Skills cubre la distribución; MCP añadiría
   esquemas por request sin ganancia clara aquí. Se reevalúa si algún host
   deja de soportar skills.
+- **Harness²** — se diseñó una evaluación aislada en
+  `docs/EXPERIMENTO-HARNESS2.md`, pero no forma parte del runtime ni de sus
+  dependencias. Sus resultados publicados no se consideran evidencia sobre
+  Repofibe; cualquier piloto requiere un executor compatible y un entorno
+  temporal separado.

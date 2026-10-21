@@ -5,11 +5,4 @@ node_modules/
 Thumbs.db
 .agent/
 
-# Playwright es dependencia OPCIONAL: se importa dinámicamente y el núcleo
-# degrada con gracia sin ella. Commitear un package.json que la liste la
-# convertiría en obligatoria para quien clone, y repofibe dejaría de ser
-# cero-dependencias — que es una de sus decisiones de arquitectura, no un
-# detalle. Se instala a mano para cerrar las suites de navegador:
-#   npm install playwright && npx playwright install chromium
-package.json
-package-lock.json
+# Los manifests son parte del checkout reproducible; node_modules sigue fuera.
