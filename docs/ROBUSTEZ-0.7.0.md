@@ -71,7 +71,7 @@ refresco o una desinstalación. Sus campos son:
 | `rutas` | Rutas absolutas de las raíces donde se registró contenido de Repofibe, incluida la aplicación compartida y las carpetas de skills. |
 | `archivos` | Entradas `{ ruta, sha256 }` por archivo regular registrado. El hash se compara con el contenido actual para decidir si el instalador puede actualizar o retirar ese archivo sin pisar una edición posterior. |
 | `bloques` | Rutas de archivos con contenido gestionado, como reglas marcadas de `AGENTS.md` o `settings.json` al registrar hooks. |
-| `bloquesPropios` | Entradas `{ ruta, sha256, creado }`: hash del bloque marcado o, para `settings.json`, del JSON registrado; `creado` indica si el archivo de destino no existía al registrarlo. El instalador conserva contenido ajeno y sólo retira un bloque marcado si su hash coincide. |
+| `bloquesPropios` | Entradas `{ ruta, sha256, creado }`: hash del bloque marcado o, para `settings.json`, del JSON serializado completo cuando se registraron los hooks; `creado` indica si el archivo de destino no existía al registrarlo. Al ejecutar `--quitar`, los hooks se retiran comparando los comandos gestionados de `PreToolUse`/`SessionStart` y la entrada heredada exacta de `PostToolUse`; el hash JSON no se usa para seleccionar qué hooks retirar. Para otros bloques marcados, se conserva contenido ajeno y sólo se retiran si su hash coincide. |
 | `directorios` | Directorios creados durante la instalación; al desinstalar sólo se quitan si siguen vacíos. |
 | `destinos` | Raíces de skills instaladas, usadas para localizar destinos durante `--refrescar`. |
 | `plugins` | Identificadores de plugin anotados en el registro. `repofibe` significa que el instalador lo registró; no demuestra que Claude Code lo haya cargado. |
@@ -96,9 +96,9 @@ contrato distinto del registro de instalación. Cada ejecución escribe
 | `argsRedactados` | Representación para inspección: argumentos que parecen flags (`-x` o `--nombre`) quedan visibles; los demás se sustituyen por `<REDACTADO:n bytes>`. No es una copia ejecutable de los argumentos. |
 | `workspaceId` | SHA-256 de la ruta absoluta resuelta del workspace, normalizada a barras `/` y minúsculas. Identifica esa ruta local, no una persona o repositorio global. |
 | `commit` | `HEAD` de Git al tomar la huella anterior a ejecutar el comando. |
-| `fuentesFingerprint`, `fuentes` | Huella SHA-256 agregada y lista de `{ ruta, sha256 }` observada antes del comando. Incluye todos los archivos rastreados y los no rastreados con extensiones configuradas o nombres de configuración; omite rutas que empiezan por `.fabrica/` o `.git/` y rutas que contienen `/node_modules/`. Un enlace se resume como `SYMLINK:<destino>` y una ruta ilegible o ausente con `MISSING:<error>` antes de calcular su hash. |
+| `fuentesFingerprint`, `fuentes` | Huella SHA-256 agregada y lista de `{ ruta, sha256 }` observada antes del comando. Incluye todos los archivos rastreados y los no rastreados con extensiones configuradas o nombres de configuración; omite rutas que empiezan por `.fabrica/` o `.git/` y rutas que contienen `/node_modules/`. Un enlace se resume como `SYMLINK:<destino>` y una ruta ilegible o ausente como `MISSING:<error.code>` (o `MISSING:unknown` si no hay código) antes de calcular su hash. |
 | `iniciado`, `finalizado` | Tiempos ISO-8601 de inicio y fin de la ejecución. |
-| `exitCode` | Código del proceso; el runner usa `124` para timeout y `127` cuando no obtiene un estado y hay un error de lanzamiento distinto de timeout. |
+| `exitCode` | Código de salida del proceso cuando `status` es entero. Si no lo es, el runner usa `124` cuando `error.code` es `ETIMEDOUT` y `127` en los demás casos, incluidas terminaciones sin estado numérico (por ejemplo, por señal) y otros errores. |
 | `fuentesEstables` | `true` si `HEAD` y la huella de fuentes son iguales antes y después del comando. |
 | `hashesSalida` | SHA-256 de los textos guardados para `stdout` y `stderr`, después del redactor. |
 | `logs` | Para cada stream: ruta relativa, SHA-256, `redactado: true` y `hallazgos` (`tipo` y cantidad de patrones sustituidos). |
@@ -157,10 +157,13 @@ y presupuesto.
 ### Si el rollback informa que quedó incompleto
 
 El instalador no ofrece un comando de reparación ni conserva una copia de
-respaldo general de los archivos previos. Las advertencias identifican la
-ruta cuyo rollback se omitió o falló; la compensación externa de Claude puede
-reportar por separado un `plugin uninstall` o `marketplace remove` pendiente.
-No supongas que el estado volvió al punto inicial ni borres esas rutas para
+respaldo general de los archivos previos. Las advertencias de rollback
+identifican las rutas o archivos cuya restauración se omitió o falló; la
+compensación externa de Claude puede reportar por separado una falla en
+`plugin uninstall` o `marketplace remove`. La limpieza de directorios es
+distinta: algunas excepciones en ese paso se capturan sin imprimir aviso, por
+lo que la ausencia de advertencias no prueba que todos quedaran limpios. No
+supongas que el estado volvió al punto inicial ni borres esas rutas para
 forzar una reinstalación.
 
 1. Conserva la salida completa del instalador y anota cada ruta, motivo y
