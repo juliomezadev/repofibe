@@ -5,6 +5,32 @@ no está publicado. G4 Windows se acepta sólo con la evidencia de la matriz
 local descrita en el informe de release; G4 multiplataforma permanece abierto
 hasta ejecutar sus checks obligatorios de CI y las pruebas POSIX/macOS.
 
+## Criterios de aceptación para Windows
+
+El alcance Windows de G4 se considera verificado cuando se cumplen estos
+criterios en Windows x64:
+
+1. El paquete identifica la versión y el commit, contiene los hashes de todos
+   sus archivos y su manifiesto de distribución resulta `coherente`.
+2. La extracción e instalación limpia funcionan con Node 22.23.4 y 24.22.1;
+   el diagnóstico de la app instalada queda `coherente`.
+3. Los flujos básicos instalados funcionan: estado de sprint, skills del host
+   y hook de guardia ante una entrada permitida y una destructiva simulada.
+4. Una actualización fallida restaura los bytes de la versión anterior, su
+   manifiesto y registro; el marcador temporal desaparece y los datos del
+   usuario conservan sus hashes. Al retirar la obstrucción, el refresco
+   instala 0.7.0 y vuelve a pasar el diagnóstico.
+5. `npm audit` no encuentra vulnerabilidades en las dos versiones de Node
+   probadas.
+6. No se elevan permisos ni se activa Developer Mode para crear symlinks. Si
+   Windows devuelve `EPERM` al crear un symlink de archivo, el caso conserva
+   estado parcial y se informa; una junction sirve como cobertura adicional
+   de directorios, pero no se cuenta como certificación del symlink POSIX.
+
+Estos criterios delimitan únicamente Windows x64. No cierran G4 en su alcance
+multiplataforma: Linux/macOS y los checks obligatorios bloqueados de GitHub
+siguen pendientes.
+
 ## Compatibilidad y requisitos
 
 - Windows x64. Se validó en Windows 10 Enterprise LTSC x64, build 17763.
