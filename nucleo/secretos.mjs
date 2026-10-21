@@ -28,7 +28,7 @@ import { pathToFileURL } from "node:url";
 const PATRONES = [
   ["pem", /-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]+?-----END [A-Z ]+PRIVATE KEY-----/g, null],
   ["aws_access_key_id", /\bAKIA[0-9A-Z]{16}\b/g, null],
-  ["aws_secret_key", /\b(aws_secret_access_key|aws_secret_key)\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})['"]?/gi, 2],
+  ["aws_secret_key", /\b(aws_secret_access_key|aws_secret_key)["']?\s*[:=]\s*['"]?([A-Za-z0-9/+=]{40})['"]?/gi, 2],
   ["github_token", /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, null],
   ["gitlab_token", /\bglpat-[A-Za-z0-9_-]{20,}\b/g, null],
   ["openai_key", /\bsk-(proj-)?[A-Za-z0-9_-]{20,}\b/g, null],
@@ -36,9 +36,9 @@ const PATRONES = [
   ["jwt", /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, null],
   ["conexion_db", /\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^:\s'"]+:[^@\s'"]+@[^\s'"]+/gi, null],
   // Asignación genérica de secreto: clave conocida = valor literal (no una
-  // referencia a variable/env, no un placeholder obvio). Grupo 1 = nombre
-  // de la clave (p.ej. "access_token"), grupo 2 = el valor — nunca al revés.
-  ["asignacion_generica", /\b(secret|password|passwd|pwd|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*['"]([^'"\s]{8,})['"]/gi, 2],
+  // referencia a variable/env, no un placeholder obvio). El grupo 4 contiene
+  // el valor candidato; las comillas opcionales de la clave permiten JSON.
+  ["asignacion_generica", /(['"]?)(\b(?:secret|password|passwd|pwd|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\b)\1\s*[:=]\s*(['"])([^'"\s]{8,})\3/gi, 4],
 ];
 
 const PLACEHOLDERS = /^(your|yourkey|your_key|changeme|change_me|xxx+|<[^>]+>|\$\{[^}]+\}|process\.env|env\.|null|undefined|true|false|example|placeholder|todo|fixme)/i;
@@ -52,7 +52,13 @@ export function redactar(texto) {
       const valor = idxValor === null ? match : args[idxValor]; // args[i] = grupo i (1-indexado)
       if (PLACEHOLDERS.test(valor ?? "")) return match;
       conteo[tipo] = (conteo[tipo] ?? 0) + 1;
-      return `<REDACTADO:${tipo}>`;
+      const marcador = `<REDACTADO:${tipo}>`;
+      if (idxValor === null) return marcador;
+      // En asignaciones (incluido JSON/JSONL), conserva clave y delimitadores
+      // y sustituye únicamente el valor para que el documento siga siendo válido.
+      const inicioValor = match.lastIndexOf(valor);
+      if (inicioValor < 0) return marcador;
+      return `${match.slice(0, inicioValor)}${marcador}${match.slice(inicioValor + valor.length)}`;
     });
   }
   const hallazgos = Object.entries(conteo).map(([tipo, cantidad]) => ({ tipo, cantidad }));

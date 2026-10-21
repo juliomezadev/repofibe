@@ -29,7 +29,10 @@ function probarDeteccionPositiva() {
   for (const [tipo, texto] of casos) {
     const { texto: redactado, hallazgos } = redactar(texto);
     assert.ok(hallazgos.some((h) => h.tipo === tipo), `no se detectó "${tipo}" en: ${texto}`);
-    assert.ok(!redactado.includes(texto.match(/[A-Za-z0-9/+=._-]{16,}/)?.[0] ?? "\0IMPOSIBLE\0") || tipo === "pem",
+    const valorDetectable = tipo === "aws_secret_key"
+      ? texto.match(/=\s*['"]?([A-Za-z0-9/+=]{40})/)?.[1]
+      : texto.match(/[A-Za-z0-9/+=._-]{16,}/)?.[0];
+    assert.ok(!redactado.includes(valorDetectable ?? "\0IMPOSIBLE\0") || tipo === "pem",
       `el secreto de "${tipo}" sigue visible en el texto redactado: ${redactado}`);
   }
   console.log(`ok: detección positiva en los ${casos.length} formatos conocidos (AWS, GitHub, GitLab, OpenAI, Slack, JWT, PEM, conexión DB, asignación genérica)`);
@@ -65,7 +68,24 @@ function probarGrupoValorCorrecto() {
   console.log("ok: el chequeo de placeholder usa el grupo de VALOR, no el nombre de la clave");
 }
 
+function probarJsonYDiffSintetico() {
+  const password = "JsonPass" + "word-2026!";
+  const token = "TokenVal" + "ue-2026!";
+  const diff = [
+    '--- a/config.json',
+    '+++ b/config.json',
+    `-{"password":"${password}","access_token":"${token}"}`,
+    `+{"password":"${password}","access_token":"${token}"}`,
+  ].join("\n");
+  const { texto, hallazgos } = redactar(diff);
+  assert.ok(!texto.includes(password), "la contraseña sintética no debe quedar visible en el diff JSON");
+  assert.ok(!texto.includes(token), "el token sintético no debe quedar visible en el diff JSON");
+  assert.ok(hallazgos.some((h) => h.tipo === "asignacion_generica"), "el diff JSON debe reportar secretos de asignación");
+  console.log("ok: secretos de claves JSON se detectan en un diff sintético");
+}
+
 probarDeteccionPositiva();
 probarSinFalsosPositivos();
 probarGrupoValorCorrecto();
+probarJsonYDiffSintetico();
 console.log("Secretos: detección positiva, ausencia de falsos positivos, y grupo de valor correcto verificados.");
