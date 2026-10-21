@@ -24,6 +24,7 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { analizarGitPush } from "../../nucleo/politica-riesgo.mjs";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const casa = mkdtempSync(join(tmpdir(), "repofibe-guardia-"));
@@ -63,6 +64,9 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
     ["git restore .", "idem con git restore — evadía antes"],
     ["git stash clear", "borra trabajo guardado"],
     ["git push --force origin main", "push forzado"],
+    ["git push --signed --force origin main", "push firmado con force posterior a --signed"],
+    ["git push --recurse-submodules --force origin main", "push con submodulos y force posterior al flag"],
+    ["git push --signed --force-with-lease --force origin main", "push firmado con force posterior a --force-with-lease"],
     ["git push -f origin main", "push forzado con flag corto"],
     ["git push --force --force-with-lease origin main", "force combinado con lease"],
     ["git push origin feature && git push --force origin main", "push normal seguido de push forzado"],
@@ -93,6 +97,8 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
     "git push origin feature && git push origin main",
     "git push origin main --push-option +metadata",
     "git push -o --force origin main",
+    "git push --signed origin main",
+    "git push --recurse-submodules=check origin main",
     "npm test", "npm install", "node evals/validar.mjs",
     "find . -name '*.js'", "chmod 644 archivo", "ls -la",
   ];
@@ -101,6 +107,25 @@ const porEscritura = (file_path, content) => decidir({ tool_name: "Write", tool_
   if (molestados.length) {
     fallo(`falsos positivos en comandos cotidianos: ${molestados.join(", ")}. Un guardia que estorba se apaga.`);
   } else ok(`no molesta en ${cotidianos.length} comandos cotidianos (incluido --force-with-lease)`);
+}
+
+// --force-with-lease sigue siendo un push protegido por lease: se reconoce
+// para que otros consumidores puedan aplicar su contrato, pero no alerta.
+{
+  for (const comando of [
+    "git push --signed --force origin main",
+    "git push --recurse-submodules --force origin main",
+  ]) {
+    const resultado = analizarGitPush(comando);
+    if (!resultado.requiereProteccion) {
+      fallo(`analizarGitPush no marca como forzado ${JSON.stringify(comando)}: ${JSON.stringify(resultado)}`);
+    } else ok(`analizarGitPush reconoce el flag forzado posterior: ${comando}`);
+  }
+
+  const resultado = analizarGitPush("git push --signed --force-with-lease origin main");
+  if (!resultado.esGitPush || !resultado.conForceWithLease || resultado.forzado || resultado.requiereProteccion) {
+    fallo(`--signed --force-with-lease debe conservar el contrato seguro, con lease reconocido: ${JSON.stringify(resultado)}`);
+  } else ok("--signed --force-with-lease reconoce lease y conserva el silencio");
 }
 
 // ── 3. /guardian debe FUNCIONAR ────────────────────────────────────────────

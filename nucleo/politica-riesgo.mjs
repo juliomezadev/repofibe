@@ -173,7 +173,7 @@ function pushForzado(argumentos) {
   let lease = false;
   let forzado = false;
   const opcionesConValor = new Set([
-    "-o", "--push-option", "--receive-pack", "--repo", "--recurse-submodules", "--signed",
+    "-o", "--push-option", "--receive-pack", "--repo",
   ]);
 
   for (let i = 0; i < argumentos.length; i += 1) {
