@@ -2,15 +2,50 @@
 // sync.mjs — sincronización de memoria entre máquinas via git con 3-Way Merge Driver
 
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { conBloqueoExclusivoSync, escribirAtomicoSync } from "./persistencia.mjs";
 
 const SYNC_HOME = process.env.REPOFIBE_SYNC_HOME || homedir();
-const CONFIG_FILE = join(SYNC_HOME, ".repofibe", "sync-config.json");
-const DIR_SYNC = join(SYNC_HOME, ".repofibe", "sync-repo");
+const DIR_REPOFIBE = join(SYNC_HOME, ".repofibe");
+const CONFIG_FILE = join(DIR_REPOFIBE, "sync-config.json");
+const DIR_SYNC = join(DIR_REPOFIBE, "sync-repo");
+
+function lstatOpcional(path) {
+  try { return lstatSync(path); }
+  catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+function exigirDirectorioReal(path, etiqueta, opcional = false) {
+  const info = lstatOpcional(path);
+  if (!info && opcional) return false;
+  if (!info || info.isSymbolicLink() || !info.isDirectory()) {
+    throw new Error(`Sync seguro: ${etiqueta} debe ser un directorio real, sin symlinks ni junctions.`);
+  }
+  return true;
+}
+
+function exigirArchivoJsonlSeguro(path, etiqueta, opcional = false) {
+  const info = lstatOpcional(path);
+  if (!info && opcional) return false;
+  if (!info || info.isSymbolicLink() || !info.isFile()) {
+    throw new Error(`Sync seguro: ${etiqueta} debe ser un archivo regular, sin symlinks.`);
+  }
+  return true;
+}
+
+function validarArbolRepoSync() {
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
+  const dirFabrica = join(DIR_SYNC, "fabrica");
+  if (!exigirDirectorioReal(dirFabrica, "fabrica del espejo", true)) return false;
+  for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
+    exigirArchivoJsonlSeguro(join(dirFabrica, arch), `fabrica/${arch}`, true);
+  }
+  return true;
+}
 
 function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
@@ -21,6 +56,7 @@ function gitBytes(args) {
 }
 
 function configurarRepoSync() {
+  validarArbolRepoSync();
   // Convierte solo checkouts cuya única diferencia sea CRLF de autocrlf; una
   // edición real en el espejo se conserva y detiene el sync para evitar pérdida.
   const rutas = git(["-C", DIR_SYNC, "ls-files", "--", "fabrica/memoria.jsonl", "fabrica/dominio-notas.jsonl"])
@@ -33,7 +69,7 @@ function configurarRepoSync() {
   const normalizar = [];
   for (const ruta of rutas) {
     const path = join(DIR_SYNC, ruta);
-    if (!existsSync(path)) throw new Error(`Sync espejo sin ${ruta}; no se normalizan datos locales.`);
+    exigirArchivoJsonlSeguro(path, `fabrica/${ruta}`);
     let head;
     try { head = gitBytes(["-C", DIR_SYNC, "show", `HEAD:${ruta}`]); }
     catch { throw new Error(`Sync espejo sin blob HEAD para ${ruta}; no se normalizan datos locales.`); }
@@ -49,7 +85,11 @@ function configurarRepoSync() {
   // Este espejo transporta líneas JSONL byte a byte; autocrlf alteraría los
   // terminadores del checkout y haría que el merge las interpretara como nuevas.
   git(["-C", DIR_SYNC, "config", "core.autocrlf", "false"]);
-  for (const [path, bytes] of normalizar) writeFileSync(path, bytes);
+  for (const [path, bytes] of normalizar) {
+    validarArbolRepoSync();
+    exigirArchivoJsonlSeguro(path, path);
+    escribirAtomicoSync(path, bytes);
+  }
 }
 
 function textoErrorGit(error) {
@@ -201,27 +241,35 @@ export async function push(dirFabrica) {
     console.log(`⚠️ Se redactaron ${secretos} posibles secretos en .fabrica/ antes de push.`);
   }
 
-  if (!existsSync(DIR_SYNC)) {
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  if (!lstatOpcional(DIR_SYNC)) {
     git(["clone", config.repo, DIR_SYNC]);
+  } else {
+    exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
   }
   configurarRepoSync();
 
   const syncFabrica = join(DIR_SYNC, "fabrica");
-  mkdirSync(syncFabrica, { recursive: true });
+  if (!exigirDirectorioReal(syncFabrica, "fabrica del espejo", true)) mkdirSync(syncFabrica);
+  exigirDirectorioReal(syncFabrica, "fabrica del espejo");
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
     const src = join(dirFabrica, arch);
+    const dest = join(syncFabrica, arch);
+    exigirArchivoJsonlSeguro(dest, `fabrica/${arch}`, true);
     if (existsSync(src)) {
-      writeFileSync(join(syncFabrica, arch), readFileSync(src, "utf8"));
+      escribirAtomicoSync(dest, readFileSync(src, "utf8"));
+      exigirArchivoJsonlSeguro(dest, `fabrica/${arch}`);
     }
   }
+  validarArbolRepoSync();
 
   // Auth nunca entra al Ã­ndice: contiene cookies, storageState y sesiones
   // locales. El reset evita que una copia histÃ³rica de fabrica/auth/ oculte
   // una modificaciÃ³n accidental al usar `git add -A`.
   try { git(["-C", DIR_SYNC, "reset", "--", "fabrica/auth"]); } catch {}
   const permitidos = ["memoria.jsonl", "dominio-notas.jsonl"]
-    .filter((arch) => existsSync(join(syncFabrica, arch)))
+    .filter((arch) => exigirArchivoJsonlSeguro(join(syncFabrica, arch), `fabrica/${arch}`, true))
     .map((arch) => `fabrica/${arch}`);
   if (permitidos.length) {
     try { git(["-C", DIR_SYNC, "add", "-A", "--", ...permitidos]); } catch {}
@@ -246,12 +294,15 @@ export async function pull(dirFabrica) {
   const config = cargarConfig();
   if (!config) throw new Error("No hay repo de sync configurado — ejecuta: sync.mjs configurar <url-repo-git-privado>");
 
-  if (!existsSync(DIR_SYNC)) {
+  exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
+  if (!lstatOpcional(DIR_SYNC)) {
     try {
       git(["clone", config.repo, DIR_SYNC]);
     } catch (e) {
       throw errorSync(clasificarErrorSync(e), e);
     }
+  } else {
+    exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
   }
   configurarRepoSync();
 
@@ -265,8 +316,9 @@ export async function pull(dirFabrica) {
   const commitDespues = commitActual();
   const resultadoPull = commitAntes && commitAntes === commitDespues ? "sin-cambios" : "actualizado";
 
+  const hayFabrica = validarArbolRepoSync();
   const syncFabrica = join(DIR_SYNC, "fabrica");
-  if (!existsSync(syncFabrica)) {
+  if (!hayFabrica) {
     console.log("Repo de sync vacío — sin cambios para traer.");
     return { ok: true, estado: resultadoPull };
   }

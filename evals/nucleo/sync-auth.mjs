@@ -2,7 +2,7 @@
 // Regresión Batch 2: sync solo comparte memoria/notas; auth permanece local.
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
@@ -153,6 +153,57 @@ try {
   const checkoutRemoto = readFileSync(join(INSPECT, "fabrica", "memoria.jsonl"), "utf8");
   assert.deepEqual(checkoutRemoto.split("\n").filter(Boolean).map((linea) => JSON.parse(linea.replace(/\r$/, ""))), remotoJsonl.map((linea) => JSON.parse(linea)), "checkout remoto con CRLF sigue parseable sin alterar su blob");
   assert.equal(readFileSync(authPath, "utf8"), authOriginal, "auth local sigue idéntica después de todo el ciclo");
+
+  const outside = join(TEMP, "sentinel-externo");
+  mkdirSync(outside);
+  const sentinel = join(outside, "sentinel.jsonl");
+  const sentinelBytes = Buffer.from('{"sentinel":"intacto"}\n', "utf8");
+  writeFileSync(sentinel, sentinelBytes);
+  const memoriaEspejoFinal = join(syncRepo, "fabrica", "memoria.jsonl");
+  const memoriaEspejoAntes = readFileSync(memoriaEspejoFinal);
+  rmSync(memoriaEspejoFinal);
+  let reparseArchivoCreado = false;
+  try {
+    symlinkSync(sentinel, memoriaEspejoFinal, "file");
+    reparseArchivoCreado = true;
+  } catch (error) {
+    if (process.platform !== "win32") throw error;
+    try {
+      symlinkSync(outside, memoriaEspejoFinal, "junction");
+      reparseArchivoCreado = true;
+    } catch (errorJunction) {
+      console.log(`skip: Windows no permitió symlink ni junction en JSONL (${errorJunction.code || error.code || error.message})`);
+    }
+  }
+  if (reparseArchivoCreado) {
+    await assert.rejects(pull(fabrica), /archivo regular, sin symlinks/, "rechaza symlink en un JSONL gestionado");
+    assert.deepEqual(readFileSync(sentinel), sentinelBytes, "el symlink del JSONL no modifica el sentinel externo");
+    rmSync(memoriaEspejoFinal);
+  }
+  writeFileSync(memoriaEspejoFinal, memoriaEspejoAntes);
+
+  const fabricaEspejo = join(syncRepo, "fabrica");
+  rmSync(fabricaEspejo, { recursive: true, force: true });
+  let junctionCreada = false;
+  try {
+    symlinkSync(outside, fabricaEspejo, "junction");
+    junctionCreada = true;
+  } catch (error) {
+    if (process.platform !== "win32") throw error;
+    console.log(`skip: Windows no permitió junction de directorio (${error.code || error.message})`);
+  }
+  if (junctionCreada) {
+    await assert.rejects(pull(fabrica), /fabrica del espejo debe ser un directorio real/, "rechaza junction en fabrica");
+    assert.deepEqual(readFileSync(sentinel), sentinelBytes, "la junction de fabrica no modifica el sentinel externo");
+    rmSync(fabricaEspejo, { recursive: true, force: true });
+  }
+
+  if (junctionCreada) {
+    rmSync(syncRepo, { recursive: true, force: true });
+    symlinkSync(outside, syncRepo, "junction");
+    await assert.rejects(pull(fabrica), /la raíz del repo espejo debe ser un directorio real/, "rechaza junction en la raíz del espejo");
+    assert.deepEqual(readFileSync(sentinel), sentinelBytes, "la junction de la raíz no modifica el sentinel externo");
+  }
   console.log("ok: push/pull por Git preserva JSONL byte a byte, integra el cambio remoto y mantiene auth local");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });
