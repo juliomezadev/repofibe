@@ -16,6 +16,42 @@ function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
 }
 
+function gitBytes(args) {
+  return execFileSync("git", args, { env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function configurarRepoSync() {
+  // Convierte solo checkouts cuya única diferencia sea CRLF de autocrlf; una
+  // edición real en el espejo se conserva y detiene el sync para evitar pérdida.
+  const rutas = git(["-C", DIR_SYNC, "ls-files", "--", "fabrica/memoria.jsonl", "fabrica/dominio-notas.jsonl"])
+    .split("\n").filter(Boolean);
+  const staged = rutas.length
+    ? git(["-C", DIR_SYNC, "diff", "--cached", "--name-only", "HEAD", "--", ...rutas]).trim()
+    : "";
+  if (staged) throw new Error(`Sync espejo con cambios staged en ${staged}; no se normalizan datos locales.`);
+
+  const normalizar = [];
+  for (const ruta of rutas) {
+    const path = join(DIR_SYNC, ruta);
+    if (!existsSync(path)) throw new Error(`Sync espejo sin ${ruta}; no se normalizan datos locales.`);
+    let head;
+    try { head = gitBytes(["-C", DIR_SYNC, "show", `HEAD:${ruta}`]); }
+    catch { throw new Error(`Sync espejo sin blob HEAD para ${ruta}; no se normalizan datos locales.`); }
+    const actual = readFileSync(path);
+    if (actual.equals(head)) continue;
+    const crlf = Buffer.from(head.toString("utf8").replace(/\r?\n/g, "\r\n"), "utf8");
+    if (!actual.equals(crlf)) {
+      throw new Error(`Sync espejo con cambios locales fuera de finales de línea en ${ruta}; no se normalizan datos locales.`);
+    }
+    normalizar.push([path, head]);
+  }
+
+  // Este espejo transporta líneas JSONL byte a byte; autocrlf alteraría los
+  // terminadores del checkout y haría que el merge las interpretara como nuevas.
+  git(["-C", DIR_SYNC, "config", "core.autocrlf", "false"]);
+  for (const [path, bytes] of normalizar) writeFileSync(path, bytes);
+}
+
 function textoErrorGit(error) {
   return [error?.stderr, error?.stdout, error?.message]
     .filter(Boolean)
@@ -168,6 +204,7 @@ export async function push(dirFabrica) {
   if (!existsSync(DIR_SYNC)) {
     git(["clone", config.repo, DIR_SYNC]);
   }
+  configurarRepoSync();
 
   const syncFabrica = join(DIR_SYNC, "fabrica");
   mkdirSync(syncFabrica, { recursive: true });
@@ -216,6 +253,7 @@ export async function pull(dirFabrica) {
       throw errorSync(clasificarErrorSync(e), e);
     }
   }
+  configurarRepoSync();
 
   const commitAntes = commitActual();
   try {
