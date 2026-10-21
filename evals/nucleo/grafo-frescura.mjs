@@ -3,7 +3,7 @@
 // incluido el working tree, y recuperarse de formatos antiguos/corruptos.
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
@@ -11,8 +11,8 @@ import assert from "node:assert/strict";
 const RAIZ = fileURLToPath(new URL("../../", import.meta.url));
 const GRAFO = join(RAIZ, "nucleo", "grafo.mjs");
 const TEMP = mkdtempSync(join(tmpdir(), "repofibe-grafo-frescura-"));
-const git = (args) => execFileSync("git", args, { cwd: TEMP, encoding: "utf8" }).trim();
-const cli = (args) => execFileSync(process.execPath, [GRAFO, ...args], { cwd: TEMP, encoding: "utf8" });
+const git = (args) => execFileSync("git", args, { cwd: TEMP, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const cli = (args) => execFileSync(process.execPath, [GRAFO, ...args], { cwd: TEMP, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const leer = () => JSON.parse(readFileSync(join(TEMP, ".fabrica", "grafo.json"), "utf8"));
 
 try {
@@ -62,7 +62,41 @@ try {
   assert.match(recuperado, /Grafo generado|IMPACTO/);
   assert.equal(leer().version, 2, "el grafo corrupto se recupera sin excepción no controlada");
 
-  console.log("ok: frescura por commit y fingerprint, working tree explícito, legacy y corrupción controlados");
+  // F12: un cambio exclusivo de resolver config debe invalidar y recalcular
+  // tanto la metadata de frescura como las aristas derivadas de alias.
+  mkdirSync(join(TEMP, "src"), { recursive: true });
+  mkdirSync(join(TEMP, "alt"), { recursive: true });
+  writeFileSync(join(TEMP, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } } }));
+  writeFileSync(join(TEMP, "tsconfig.json"), JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } } }));
+  writeFileSync(join(TEMP, "src", "mod.mjs"), "export const value = 1;\n");
+  writeFileSync(join(TEMP, "alt", "mod.mjs"), "export const value = 2;\n");
+  writeFileSync(join(TEMP, "consumer.mjs"), "import { value } from '@/mod';\nexport { value };\n");
+  cli(["generar"]);
+  assert.ok(leer().aristas["consumer.mjs"].includes("src/mod.mjs"), "el alias configurado apunta a src");
+  writeFileSync(join(TEMP, "tsconfig.json"), JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["alt/*"] } } }));
+  assert.match(cli(["frescura"]), /NO CONFIABLE/, "editar solo paths debe invalidar el grafo");
+  cli(["impacto", "alt/mod.mjs"]);
+  assert.ok(leer().aristas["consumer.mjs"].includes("alt/mod.mjs"), "regenerar aplica la nueva configuración de paths");
+  writeFileSync(join(TEMP, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["src/*"] } } }));
+  writeFileSync(join(TEMP, "tsconfig.json"), JSON.stringify({ extends: "./base.json" }));
+  cli(["generar"]);
+  assert.ok(leer().aristas["consumer.mjs"].includes("src/mod.mjs"), "el alias heredado apunta a src");
+  writeFileSync(join(TEMP, "base.json"), JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@/*": ["alt/*"] } } }));
+  assert.match(cli(["frescura"]), /NO CONFIABLE/, "editar solo una configuración extends debe invalidar el grafo");
+  cli(["impacto", "alt/mod.mjs"]);
+  assert.ok(leer().aristas["consumer.mjs"].includes("alt/mod.mjs"), "regenerar aplica la configuración extendida nueva");
+  writeFileSync(join(TEMP, "base.json"), JSON.stringify({ extends: "./tsconfig.json" }));
+  assert.match(cli(["frescura"]), /NO CONFIABLE/, "un ciclo extends no debe considerarse configuración confiable");
+  assert.throws(() => cli(["impacto", "alt/mod.mjs"]), /NO CONFIABLE|configuraci[oó]n/i,
+    "un ciclo extends no genera una consulta confiable");
+  writeFileSync(join(TEMP, "tsconfig.json"), JSON.stringify({ extends: "./falta.json" }));
+  assert.match(cli(["frescura"]), /NO CONFIABLE/, "un extends local ausente no se considera confiable");
+  assert.throws(() => cli(["impacto", "alt/mod.mjs"]), /NO CONFIABLE|configuraci[oó]n/i,
+    "un extends local ausente impide consultar el grafo");
+  writeFileSync(join(TEMP, "tsconfig.json"), "{ no es json }");
+  assert.match(cli(["frescura"]), /NO CONFIABLE/, "una configuración ilegible no se considera confiable");
+
+  console.log("ok: frescura por commit, fingerprint, configs extendidas y ciclos controlados");
 } finally {
   rmSync(TEMP, { recursive: true, force: true });
 }
