@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validar.mjs — evals tier 1 de repofibe: gratis, <5s, sin red.
+// validar.mjs — evals tier 1 de repofibe: gratis, sin red externa.
 // Valida estructura (skills, manifiestos, hooks) Y comportamiento real
 // (estado, memoria y guardia se ejecutan de verdad contra un dir temporal).
 // Salida: lista de fallos; exit 1 si hay alguno. Pensado para CI y pre-commit.
@@ -9,6 +9,8 @@ import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFileSync, spawnSync } from "node:child_process";
+import { prepararVeredicto } from "./veredicto.mjs";
+import { descubrirArchivos } from "../nucleo/archivos.mjs";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const fallos = [];
@@ -79,11 +81,9 @@ try {
 } catch (e) { fallo(`hooks.json: ${e.message}`); }
 
 // ── 4. Sintaxis de todos los .mjs ────────────────────────────────────────────
-for (const dir of ["nucleo", "hooks", "evals"]) {
-  for (const f of readdirSync(join(RAIZ, dir)).filter((f) => f.endsWith(".mjs"))) {
-    const r = spawnSync(process.execPath, ["--check", join(RAIZ, dir, f)], { encoding: "utf8" });
-    if (r.status !== 0) fallo(`${dir}/${f}: error de sintaxis → ${r.stderr.trim().split("\n")[0]}`);
-  }
+for (const ruta of descubrirArchivos(RAIZ, { extensiones: [".mjs"] })) {
+  const r = spawnSync(process.execPath, ["--check", ruta], { encoding: "utf8" });
+  if (r.status !== 0) fallo(`${ruta.replace(RAIZ, "").replaceAll("\\", "/")}: error de sintaxis → ${r.stderr.trim().split("\n")[0]}`);
 }
 if (!fallos.some((f) => f.includes("sintaxis"))) ok("sintaxis de todos los .mjs");
 
@@ -276,7 +276,17 @@ async function ejecutarPrueba(rutaRel, nombre) {
     return;
   }
 
-  const r = spawnSync(process.execPath, [ruta], { encoding: "utf8", timeout: LIMITE_MS });
+  const dirTraza = mkdtempSync(join(tmpdir(), "repofibe-eval-traza-"));
+  let r;
+  try {
+    r = spawnSync(process.execPath, [ruta], {
+      encoding: "utf8",
+      timeout: LIMITE_MS,
+      env: { ...process.env, REPOFIBE_TRAZA_DIR: dirTraza },
+    });
+  } finally {
+    rmSync(dirTraza, { recursive: true, force: true });
+  }
 
   if (r.error?.code === "ETIMEDOUT" || (r.status === null && r.signal)) {
     fallo(`${rutaRel}: TIMEOUT tras ${LIMITE_MS / 1000}s (señal ${r.signal ?? "?"}). No es un fallo lógico: la prueba no alcanzó a terminar.`);
@@ -299,6 +309,8 @@ async function ejecutarPrueba(rutaRel, nombre) {
 }
 
 await ejecutarPrueba("evals/blindaje.mjs", "Blindaje (meta-evals)");
+await ejecutarPrueba("evals/seguridad/evaluaciones-recursivas.mjs", "Evaluaciones recursivas");
+await ejecutarPrueba("evals/seguridad/contrato-cierre.mjs", "Contrato de cierre de skills");
 await ejecutarPrueba("evals/inteligencia/validar.mjs", "Inteligencia");
 await ejecutarPrueba("evals/inteligencia/modelo-scoring.mjs", "Modelo de scoring (sin comparación ejecutada)");
 await ejecutarPrueba("evals/legal/validar.mjs", "Legal (contrato documental)");
@@ -313,15 +325,32 @@ await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
 await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
 await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
+await ejecutarPrueba("evals/seguridad/memoria-confianza.mjs", "Frontera de confianza de memoria");
 await ejecutarPrueba("evals/nucleo/benchmark.mjs", "Benchmark");
 await ejecutarPrueba("evals/nucleo/cookies.mjs", "Cookies");
 await ejecutarPrueba("evals/nucleo/grafo.mjs", "Grafo (probado por lo que pierde)");
+await ejecutarPrueba("evals/nucleo/grafo-frescura.mjs", "Frescura del grafo");
+await ejecutarPrueba("evals/nucleo/estado-schema.mjs", "Esquema persistido del estado");
+await ejecutarPrueba("evals/nucleo/dependencias.mjs", "Dependencias reproducibles");
 await ejecutarPrueba("evals/nucleo/traza.mjs", "Traza Telemetría");
 await ejecutarPrueba("evals/nucleo/qaonline.mjs", "QA en Vivo (qaonline)");
+await ejecutarPrueba("evals/nucleo/qaonline-persistencia.mjs", "QA en Vivo (sesión persistente)");
 await ejecutarPrueba("evals/nucleo/juez.mjs", "Juez");
 await ejecutarPrueba("evals/nucleo/sync.mjs", "Sync");
+await ejecutarPrueba("evals/nucleo/sync-auth.mjs", "Sync (auth local)");
+await ejecutarPrueba("evals/nucleo/sync-pull.mjs", "Sync pull (errores reales)");
+await ejecutarPrueba("evals/seguridad/veredicto.mjs", "Veredicto de evals");
 
 // ── veredicto ────────────────────────────────────────────────────────────────
+const trazaFinal = existsSync(RUTA_TRAZA_REAL) ? readFileSync(RUTA_TRAZA_REAL, "utf8").length : 0;
+const veredictoFinal = prepararVeredicto({ fallos, trazaAntes, trazaDespues: trazaFinal,
+  mensajeContaminacion: "la suite escribió en la telemetría REAL (.fabrica/traza.jsonl)" });
+process.exitCode = veredictoFinal.exitCode;
+if (veredictoFinal.fallos.length) {
+  console.error(`\nFALLOS (${veredictoFinal.fallos.length}):`);
+  for (const f of veredictoFinal.fallos) console.error(`  - ${f}`);
+  process.exit(1);
+}
 if (fallos.length) {
   console.error(`\nFALLOS (${fallos.length}):`);
   for (const f of fallos) console.error(`  ✗ ${f}`);
@@ -342,7 +371,7 @@ if (fallos.length) {
 if (parciales.length) {
   console.log(`\nVerificación PARCIAL en ${parciales.length} suite(s) — no cuentan como verificadas de punta a punta:`);
   for (const p of parciales) console.log(`  · ${p}`);
-  console.log("  Causa habitual: Playwright no instalado (dependencia opcional).");
-  console.log("  Para cerrarlas: npm install playwright && npx playwright install chromium");
+  console.log("  Causa habitual: Playwright no instalado (dependencia de desarrollo).");
+  console.log("  Para cerrarlas: npm ci && npm run setup:chromium");
 }
 console.log("\nTodo verde. repofibe pasó las evals tier 1.");

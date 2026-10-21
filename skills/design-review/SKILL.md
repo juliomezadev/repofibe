@@ -19,7 +19,7 @@ este archivo; si ahí no existe `plantillas/`, usa `~/.repofibe/app`. Lee
 `/plan-diseno` audita la intención (el plan). Esta skill audita el
 RESULTADO — la app corriendo, tal como la ve un usuario. Requiere
 `navegador.mjs` (Playwright); si no está instalado, el propio comando lo
-dice — propón `npm install playwright && npx playwright install chromium`.
+dice — propón `npm ci && npm run setup:chromium`.
 
 ## Fase 1 — Objetivo y evidencia inicial
 

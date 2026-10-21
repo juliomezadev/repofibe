@@ -32,7 +32,7 @@ el reporte de bugs numerado. Por defecto: encontrar Y corregir.
      acciones (`perfil`, `navegar`, `snapshot`, `click`, `escribir`, `texto`,
      `screenshot`). Si Playwright no está instalado en el proyecto, el
      propio comando lo dice — propón
-     `npm install playwright && npx playwright install chromium`.
+     `npm ci && npm run setup:chromium`.
    - Web con gstack instalado (si el usuario ya lo tiene) → skill `/browse`
      de gstack (`$B`), como alternativa si prefiere ese motor.
    - API → curl/fetch con casos de la matriz.

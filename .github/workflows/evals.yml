@@ -17,6 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Dependencias Node
+        run: npm ci
+      - name: Chromium para QA/browser
+        run: npm run setup:chromium
       - name: Evals tier 1 (estructura + funcionales)
         run: node evals/validar.mjs
 

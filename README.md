@@ -27,17 +27,24 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-**Requisitos:** [Node.js](https://nodejs.org) 18+ y Git. Nada más — cero
-dependencias npm, cero binarios compilados en el núcleo.
+**Requisitos:** [Node.js](https://nodejs.org) 20.11+ y Git. El núcleo no tiene
+dependencias runtime externas. Las pruebas de navegador requieren npm, la
+dependencia de desarrollo Playwright fijada en `package.json` y Chromium.
 
 > **Nota de honestidad:** algunas capacidades avanzadas usan herramientas
-> externas OPCIONALES que se importan dinámicamente y degradan con gracia si
-> no están: Playwright para navegador/QA/scrape (`/qa`, `/scrape`,
-> `/design-review`, `/autenticar`), `@xenova/transformers` para búsqueda
-> semántica de memoria (~90MB de modelo la primera vez; sin él, `/memoria`
-> cae a búsqueda textual), y el CLI de un LLM (`claude`/`gemini`) para el
-> juez tier-3. El núcleo — estado, guardias, grafo, sync, checkpoints — es
-> cero-deps de verdad.
+> Playwright se importa dinámicamente para navegador/QA/scrape (`/qa`,
+> `/scrape`, `/design-review`, `/autenticar`), pero queda declarado como
+> dependencia de desarrollo para que el checkout sea reproducible. La búsqueda
+> semántica de memoria (`@xenova/transformers`) y el CLI de un LLM
+> (`claude`/`gemini`) siguen siendo capacidades opcionales externas.
+
+Desde un checkout limpio, instala las dependencias y prepara únicamente
+Chromium:
+
+```bash
+npm ci
+npm run setup:chromium
+```
 
 ```powershell
 # Windows
@@ -94,8 +101,9 @@ los hooks hay que activarlos con el comando de arriba.
 
 **pensar → planear → construir → revisar → probar → shipear → retro**
 
-Cada skill registra su resultado en `.fabrica/sprint.json`; la siguiente lo
-lee. Nada se cae por las grietas porque cada etapa sabe qué pasó antes.
+Las acciones registrables de las skills escriben su resultado en
+`.fabrica/sprint.json`; las consultas puras no mutan el estado. La política
+operativa está en `plantillas/contrato-cierre.json`.
 
 | Skill | Especialista | Qué hace |
 |---|---|---|
@@ -175,7 +183,7 @@ secreto y comprobando que no llega al archivo.
 ## Calidad del propio repo
 
 ```bash
-node evals/validar.mjs   # tier 1: gratis, <5s, corre en cada push
+node evals/validar.mjs   # tier 1: gratis, corre en cada push
 node evals/tier2.mjs     # tier 2: E2E, sesión de sprint completa simulada
 ```
 
@@ -184,17 +192,27 @@ hooks — y ejecuta de verdad `estado`, `memoria`, `guardia`, `grafo`,
 `secretos`, `salud` y `navegador` contra directorios temporales (incluidos
 los casos "rm -rf → ask", "--force-with-lease → silencio", "edición fuera
 del congelado → deny", y detección de prompt-injection con Chromium real
-cuando Playwright está instalado). Tier 2 encadena una sesión de sprint
+cuando están instalados Playwright y Chromium). Tier 2 encadena una sesión de sprint
 completa (pensar→retro, ~15 subprocesos reales) verificando que el estado
 fluye correctamente entre `estado.mjs`, `checkpoint.mjs`, `grafo.mjs` y
 `pruebas.mjs` — el tipo de bug de integración que tests aislados no
-atrapan. Ambos corren como jobs separados en CI (`.github/workflows/evals.yml`).
+atrapan. La suite LLM de Tier 2 requiere `ANTHROPIC_API_KEY` y queda
+`SKIPPED` si falta; no cuenta como PASS. Ambos corren como jobs separados en
+CI (`.github/workflows/evals.yml`).
 
-## Prioridades de desarrollo actuales
+El estado persistido y la memoria contienen datos locales del usuario; las
+sesiones `storageState` viven en `.fabrica/auth/` y no entran en sync. La
+memoria histórica se trata como dato no confiable. `sync pull` propaga errores
+de Git y distingue conflictos de éxito. El grafo se reutiliza sólo si
+coinciden el commit y el fingerprint de sus fuentes; `salud` mide la respuesta
+HTTP real antes de emitir un veredicto.
+El escáner experimental de cadena de suministro auditado en Batch 4 no forma
+parte del producto ni se cablea en `hooks/hooks.json`.
 
-- Conectar componentes construidos pero todavía huérfanos.
-- Mejorar la integración multi-host.
-- Mantener evals deterministas.
+## Hoja de ruta
+
+- **v0.4** — `/design-shotgun` (variantes + tablero + taste memory).
+- **v0.5** — `/pair-agent`, embeddings/búsqueda semántica.
 
 Seguimiento detallado contra gstack: [docs/COMPARACION-GSTACK.md](docs/COMPARACION-GSTACK.md).
 

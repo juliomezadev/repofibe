@@ -48,7 +48,7 @@ function archivoAuth(dominio, dirBase) {
 
 async function playwright() {
   try { return await import("playwright"); }
-  catch { throw new Error("Playwright no está instalado en este proyecto (repofibe es cero-deps) — instala con: npm install playwright && npx playwright install chromium"); }
+  catch { throw new Error("Playwright no está instalado en este proyecto — ejecuta: npm ci && npm run setup:chromium"); }
 }
 
 async function guardar(dominio, dirBase) {

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Pruebas funcionales de nucleo/navegador.mjs — el sistema de refs propio
 // (parsearRefs) se prueba siempre, sin dependencias. La integración real
-// con Chromium (ejecutarScript) se prueba SOLO si Playwright está
-// instalado en este proyecto — repofibe sigue siendo cero-deps, así que un
-// checkout limpio no lo tiene, y eso no debe hacer fallar la suite
+// con Chromium (ejecutarScript) se prueba si Playwright está
+// instalado en el checkout; el núcleo sigue permitiendo ejecutar la suite
+// pura sin abrir navegador, pero un checkout reproducible puede instalarlo
 // principal; se omite con evidencia clara, no en silencio.
 
 import { strict as assert } from "node:assert";
@@ -39,7 +39,7 @@ async function probarEjecutarScriptSiHayPlaywright() {
   let disponible = true;
   try { await import("playwright"); } catch { disponible = false; }
   if (!disponible) {
-    console.log("omitido: playwright no está instalado en este proyecto (repofibe es cero-deps) — instala con `npm install playwright && npx playwright install chromium` para correr esta prueba de integración real");
+    console.log("omitido: playwright no está instalado — ejecuta `npm ci && npm run setup:chromium` para correr esta prueba de integración real");
     return;
   }
 

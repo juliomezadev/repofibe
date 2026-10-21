@@ -19,12 +19,50 @@ const ETAPAS = ["pensar", "planear", "construir", "revisar", "probar", "shipear"
 const DIR = join(process.cwd(), ".fabrica");
 const ARCHIVO = join(DIR, "sprint.json");
 
-function cargar() {
-  try {
-    return JSON.parse(readFileSync(ARCHIVO, "utf8"));
-  } catch {
-    return null;
-  }
+function esObjeto(valor) {
+  return valor !== null && typeof valor === "object" && !Array.isArray(valor);
+}
+
+export function validarEstado(valor) {
+  const errores = [];
+  if (!esObjeto(valor)) errores.push("la raíz debe ser un objeto");
+  if (!esObjeto(valor)) return { valido: false, errores };
+
+  if (typeof valor.objetivo !== "string" || !valor.objetivo.trim()) errores.push("objetivo debe ser texto no vacío");
+  if (!ETAPAS.includes(valor.etapa)) errores.push(`etapa inválida: ${valor.etapa ?? "ausente"}`);
+  if (!Array.isArray(valor.historial)) errores.push("historial debe ser una lista");
+  else valor.historial.forEach((h, i) => {
+    if (!esObjeto(h) || typeof h.fecha !== "string" || typeof h.skill !== "string" || typeof h.resultado !== "string") {
+      errores.push(`historial[${i}] debe tener fecha, skill y resultado de texto`);
+    }
+  });
+  if (!Array.isArray(valor.pendientes)) errores.push("pendientes debe ser una lista");
+  else if (valor.pendientes.some((p) => typeof p !== "string")) errores.push("pendientes sólo puede contener texto");
+  if (valor.version !== undefined && (!Number.isInteger(valor.version) || valor.version < 1)) errores.push("version inválida");
+  if (valor.plan !== undefined && valor.plan !== null && typeof valor.plan !== "string") errores.push("plan debe ser texto o null");
+  if (valor.creado !== undefined && valor.creado !== null && typeof valor.creado !== "string") errores.push("creado debe ser texto o null");
+  if (valor.actualizado !== undefined && valor.actualizado !== null && typeof valor.actualizado !== "string") errores.push("actualizado debe ser texto o null");
+  if (errores.length) return { valido: false, errores };
+
+  // Migración sólo aditiva: los campos desconocidos viajan intactos.
+  const estado = {
+    ...valor,
+    version: valor.version ?? 1,
+    plan: valor.plan ?? null,
+    creado: valor.creado ?? null,
+    actualizado: valor.actualizado ?? null,
+  };
+  return { valido: true, estado, migrado: valor.version === undefined || valor.plan === undefined || valor.creado === undefined || valor.actualizado === undefined };
+}
+
+export function cargarEstado() {
+  if (!existsSync(ARCHIVO)) return { tipo: "inexistente", estado: null };
+  let valor;
+  try { valor = JSON.parse(readFileSync(ARCHIVO, "utf8")); }
+  catch (e) { return { tipo: "json-invalido", estado: null, error: e.message }; }
+  const validacion = validarEstado(valor);
+  if (!validacion.valido) return { tipo: "schema-invalido", estado: null, error: validacion.errores.join("; ") };
+  return { tipo: "valido", estado: validacion.estado, migrado: validacion.migrado };
 }
 
 function guardar(estado) {
@@ -50,7 +88,7 @@ function nuevo(objetivo) {
 
 function ver(estado) {
   if (!estado) {
-    console.log("Sin sprint activo. Inicia uno con: node estado.mjs iniciar \"<objetivo>\"");
+    console.log("Estado inexistente: no hay sprint activo. Inicia uno con: node estado.mjs iniciar \"<objetivo>\"");
     return;
   }
   console.log(`SPRINT: ${estado.objetivo}`);
@@ -68,7 +106,13 @@ function ver(estado) {
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-const estado = cargar();
+const cargado = cargarEstado();
+const estado = cargado.estado;
+if (cargado.tipo === "json-invalido" || cargado.tipo === "schema-invalido") {
+  const etiqueta = cargado.tipo === "json-invalido" ? "JSON inválido" : "esquema inválido";
+  console.error(`Estado ${etiqueta} (${cargado.tipo}): ${cargado.error}`);
+  process.exit(1);
+}
 
 switch (cmd) {
   case "ver":

@@ -2,16 +2,51 @@
 // sync.mjs — sincronización de memoria entre máquinas via git con 3-Way Merge Driver
 
 import { execFileSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL, fileURLToPath } from "node:url";
 
-const CONFIG_FILE = join(homedir(), ".repofibe", "sync-config.json");
-const DIR_SYNC = join(homedir(), ".repofibe", "sync-repo");
+const SYNC_HOME = process.env.REPOFIBE_SYNC_HOME || homedir();
+const CONFIG_FILE = join(SYNC_HOME, ".repofibe", "sync-config.json");
+const DIR_SYNC = join(SYNC_HOME, ".repofibe", "sync-repo");
 
 function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
+}
+
+function textoErrorGit(error) {
+  return [error?.stderr, error?.stdout, error?.message]
+    .filter(Boolean)
+    .map((valor) => Buffer.isBuffer(valor) ? valor.toString("utf8") : String(valor))
+    .join("\n");
+}
+
+export function clasificarErrorSync(error, { conflicto = false } = {}) {
+  const salida = textoErrorGit(error);
+  if (conflicto || /conflict|unmerged|merge failed/i.test(salida)) return "conflicto";
+  if (/repository .*not found|does not appear to be a git repository|no such remote|remote .*does not exist/i.test(salida)) return "remoto-inexistente";
+  if (/authentication failed|could not read from remote|permission denied|access denied|invalid username|terminal prompts disabled/i.test(salida)) return "autenticacion";
+  if (/could not resolve host|connection .*failed|connection timed out|timed out|network is unreachable|unable to access/i.test(salida)) return "red";
+  return "error-git";
+}
+
+function errorSync(codigo, error) {
+  const fallo = new Error(`Sync pull falló (${codigo}): ${textoErrorGit(error).trim() || "git devolvió un error"}`);
+  fallo.codigo = codigo;
+  fallo.syncSuccess = false;
+  fallo.causa = error;
+  return fallo;
+}
+
+function commitActual() {
+  try { return git(["-C", DIR_SYNC, "rev-parse", "HEAD"]).trim(); }
+  catch { return null; }
+}
+
+function tieneConflictos() {
+  try { return Boolean(git(["-C", DIR_SYNC, "diff", "--name-only", "--diff-filter=U"]).trim()); }
+  catch { return false; }
 }
 
 function cargarConfig() {
@@ -20,7 +55,7 @@ function cargarConfig() {
 }
 
 function guardarConfig(config) {
-  mkdirSync(join(homedir(), ".repofibe"), { recursive: true });
+  mkdirSync(join(SYNC_HOME, ".repofibe"), { recursive: true });
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
@@ -109,25 +144,7 @@ export async function escanearSecretos(dirFabrica) {
       encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
     }
   }
-  const authDir = join(dirFabrica, "auth");
-  if (existsSync(authDir)) {
-    for (const arch of readdirSyncList(authDir)) {
-      if (!arch.endsWith(".json")) continue;
-      const ruta = join(authDir, arch);
-      const contenido = readFileSync(ruta, "utf8");
-      const resultado = redactar(contenido);
-      if (resultado.hallazgos.length > 0) {
-        writeFileSync(ruta, resultado.texto);
-        encontrados += resultado.hallazgos.reduce((s, h) => s + h.cantidad, 0);
-      }
-    }
-  }
   return encontrados;
-}
-
-function readdirSyncList(dir) {
-  try { return readdirSync(dir); }
-  catch { return []; }
 }
 
 export async function push(dirFabrica) {
@@ -153,18 +170,16 @@ export async function push(dirFabrica) {
     }
   }
 
-  const authDir = join(dirFabrica, "auth");
-  const syncAuthDir = join(syncFabrica, "auth");
-  if (existsSync(authDir)) {
-    mkdirSync(syncAuthDir, { recursive: true });
-    for (const arch of readdirSyncList(authDir)) {
-      if (arch.endsWith(".json") && !arch.startsWith("perfil")) {
-        writeFileSync(join(syncAuthDir, arch), readFileSync(join(authDir, arch), "utf8"));
-      }
-    }
+  // Auth nunca entra al Ã­ndice: contiene cookies, storageState y sesiones
+  // locales. El reset evita que una copia histÃ³rica de fabrica/auth/ oculte
+  // una modificaciÃ³n accidental al usar `git add -A`.
+  try { git(["-C", DIR_SYNC, "reset", "--", "fabrica/auth"]); } catch {}
+  const permitidos = ["memoria.jsonl", "dominio-notas.jsonl"]
+    .filter((arch) => existsSync(join(syncFabrica, arch)))
+    .map((arch) => `fabrica/${arch}`);
+  if (permitidos.length) {
+    try { git(["-C", DIR_SYNC, "add", "-A", "--", ...permitidos]); } catch {}
   }
-
-  try { git(["-C", DIR_SYNC, "add", "-A"]); } catch {}
   try {
     git(["-C", DIR_SYNC, "commit", "-m", `sync push: ${new Date().toISOString()}`]);
     git(["-C", DIR_SYNC, "push"]);
@@ -186,19 +201,27 @@ export async function pull(dirFabrica) {
   if (!config) throw new Error("No hay repo de sync configurado — ejecuta: sync.mjs configurar <url-repo-git-privado>");
 
   if (!existsSync(DIR_SYNC)) {
-    git(["clone", config.repo, DIR_SYNC]);
+    try {
+      git(["clone", config.repo, DIR_SYNC]);
+    } catch (e) {
+      throw errorSync(clasificarErrorSync(e), e);
+    }
   }
 
+  const commitAntes = commitActual();
   try {
     git(["-C", DIR_SYNC, "pull", "--quiet"]);
   } catch (e) {
-    console.log("Auto-resolviendo pull de sync...");
+    const conflicto = tieneConflictos();
+    throw errorSync(clasificarErrorSync(e, { conflicto }), e);
   }
+  const commitDespues = commitActual();
+  const resultadoPull = commitAntes && commitAntes === commitDespues ? "sin-cambios" : "actualizado";
 
   const syncFabrica = join(DIR_SYNC, "fabrica");
   if (!existsSync(syncFabrica)) {
     console.log("Repo de sync vacío — sin cambios para traer.");
-    return;
+    return { ok: true, estado: resultadoPull };
   }
 
   for (const arch of ["memoria.jsonl", "dominio-notas.jsonl"]) {
@@ -206,18 +229,8 @@ export async function pull(dirFabrica) {
     if (n > 0) console.log(`${arch}: ${n} entradas nuevas sincronizadas.`);
   }
 
-  const syncAuthDir = join(syncFabrica, "auth");
-  const localAuthDir = join(dirFabrica, "auth");
-  if (existsSync(syncAuthDir)) {
-    mkdirSync(localAuthDir, { recursive: true });
-    for (const arch of readdirSyncList(syncAuthDir)) {
-      if (arch.endsWith(".json") && !arch.startsWith("perfil")) {
-        writeFileSync(join(localAuthDir, arch), readFileSync(join(syncAuthDir, arch), "utf8"));
-      }
-    }
-  }
-
-  console.log("✅ Cambios sincronizados.");
+  console.log(resultadoPull === "sin-cambios" ? "✅ Sync ya estaba actualizado." : "✅ Cambios sincronizados.");
+  return { ok: true, estado: resultadoPull };
 }
 
 export function configurar(repoUrl) {
