@@ -14,12 +14,18 @@ const SEED = join(TEMP, "seed");
 const REMOTE = join(TEMP, "remote.git");
 const WRITER = join(TEMP, "writer");
 const PROJECT = join(TEMP, "project");
+const GIT_SYSTEM = join(TEMP, "gitconfig-system");
+const GIT_GLOBAL = join(TEMP, "gitconfig-global");
 
 process.env.REPOFIBE_SYNC_HOME = HOME;
+process.env.GIT_CONFIG_SYSTEM = GIT_SYSTEM;
+process.env.GIT_CONFIG_GLOBAL = GIT_GLOBAL;
 process.env.GIT_AUTHOR_NAME = "repofibe eval";
 process.env.GIT_AUTHOR_EMAIL = "eval@repofibe.local";
 process.env.GIT_COMMITTER_NAME = "repofibe eval";
 process.env.GIT_COMMITTER_EMAIL = "eval@repofibe.local";
+writeFileSync(GIT_SYSTEM, "[core]\n\tautocrlf = true\n");
+writeFileSync(GIT_GLOBAL, "");
 
 function git(args, cwd) {
   return execFileSync("git", args, {
@@ -60,6 +66,14 @@ try {
   const primero = await pull(join(PROJECT, ".fabrica"));
   assert.equal(primero.ok, true);
   assert.equal(primero.estado, "sin-cambios", "un clone sin cambios posteriores debe quedar actualizado");
+  const syncRepo = join(HOME, ".repofibe", "sync-repo");
+  assert.equal(git(["-C", syncRepo, "config", "--local", "--get", "core.autocrlf"]), "false");
+  assert.deepEqual(
+    readFileSync(join(syncRepo, "fabrica", "memoria.jsonl")),
+    Buffer.from('{"tipo":"nota","texto":"base"}\n', "utf8"),
+    "un clon nuevo conserva bytes LF exactos aunque la configuración de sistema solicite CRLF",
+  );
+  assert.equal(git(["-C", syncRepo, "status", "--porcelain"]), "", "normalizar un clon nuevo no deja el índice sucio");
 
   git(["clone", "-q", REMOTE, WRITER]);
   writeFileSync(join(WRITER, "fabrica", "memoria.jsonl"), '{"tipo":"nota","texto":"remota"}\n');

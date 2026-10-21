@@ -51,6 +51,12 @@ function git(args, cwd) {
   return execFileSync("git", args, { encoding: "utf8", cwd, timeout: 15000 });
 }
 
+function clonarRepoSync(repo) {
+  // El override debe aplicarse durante el checkout inicial, antes de persistirlo
+  // en .git/config; cambiarlo después deja el JSONL con CRLF y el índice sucio.
+  git(["-c", "core.autocrlf=false", "clone", repo, DIR_SYNC]);
+}
+
 function gitBytes(args) {
   return execFileSync("git", args, { env: process.env, stdio: ["ignore", "pipe", "pipe"] });
 }
@@ -243,7 +249,7 @@ export async function push(dirFabrica) {
 
   exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
   if (!lstatOpcional(DIR_SYNC)) {
-    git(["clone", config.repo, DIR_SYNC]);
+    clonarRepoSync(config.repo);
   } else {
     exigirDirectorioReal(DIR_SYNC, "la raíz del repo espejo");
   }
@@ -297,7 +303,7 @@ export async function pull(dirFabrica) {
   exigirDirectorioReal(DIR_REPOFIBE, "la carpeta .repofibe");
   if (!lstatOpcional(DIR_SYNC)) {
     try {
-      git(["clone", config.repo, DIR_SYNC]);
+      clonarRepoSync(config.repo);
     } catch (e) {
       throw errorSync(clasificarErrorSync(e), e);
     }
@@ -308,7 +314,7 @@ export async function pull(dirFabrica) {
 
   const commitAntes = commitActual();
   try {
-    git(["-C", DIR_SYNC, "pull", "--quiet"]);
+    git(["-C", DIR_SYNC, "pull", "--no-rebase", "--quiet"]);
   } catch (e) {
     const conflicto = tieneConflictos();
     throw errorSync(clasificarErrorSync(e, { conflicto }), e);
