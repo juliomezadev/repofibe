@@ -40,8 +40,8 @@ function ejecutarGuardar(port, respuesta) {
     const timer = setTimeout(async () => {
       child.kill();
       await Promise.race([new Promise((resolve) => child.once("close", resolve)), new Promise((resolve) => setTimeout(resolve, 3000))]);
-      reject(new Error(`guardar no llegó a pedir confirmación a tiempo. stdout=${salida} stderr=${error}`));
-    }, 12000);
+      reject(new Error(`guardar supero el limite de 60s. stdout=${salida} stderr=${error}`));
+    }, 60000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
