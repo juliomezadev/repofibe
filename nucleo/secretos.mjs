@@ -42,6 +42,120 @@ const PATRONES = [
 ];
 
 const PLACEHOLDERS = /^(your|yourkey|your_key|changeme|change_me|xxx+|<[^>]+>|\$\{[^}]+\}|process\.env|env\.|null|undefined|true|false|example|placeholder|todo|fixme)/i;
+const CLAVE_SECRETA_JSON = /^(?:secret|password|passwd|pwd|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)$/i;
+
+// Para JSON válido usamos sus límites léxicos, no una regex sobre el valor:
+// una contraseña puede contener espacios, comillas escapadas o barras. Solo
+// se sustituye el token JSON del valor; el resto del documento queda intacto.
+function redactarDocumentoJson(texto) {
+  try { JSON.parse(texto); } catch { return null; }
+
+  let indice = 0;
+  const rangos = [];
+  const omitirEspacios = () => { while (/\s/.test(texto[indice] ?? "")) indice += 1; };
+  const leerCadena = () => {
+    const inicio = indice;
+    if (texto[indice] !== '"') throw new Error("cadena JSON esperada");
+    indice += 1;
+    while (indice < texto.length) {
+      if (texto[indice] === "\\") { indice += 2; continue; }
+      if (texto[indice] === '"') {
+        indice += 1;
+        return { inicio, fin: indice, valor: JSON.parse(texto.slice(inicio, indice)) };
+      }
+      indice += 1;
+    }
+    throw new Error("cadena JSON sin cierre");
+  };
+  const recorrerValor = (clave = null) => {
+    omitirEspacios();
+    const caracter = texto[indice];
+    if (caracter === '"') {
+      const cadena = leerCadena();
+      if (CLAVE_SECRETA_JSON.test(clave ?? "") && cadena.valor.length >= 8 && !PLACEHOLDERS.test(cadena.valor)) {
+        rangos.push({ ...cadena, reemplazo: JSON.stringify("<REDACTADO:asignacion_generica>") });
+      }
+      return;
+    }
+    if (caracter === "{") {
+      indice += 1;
+      omitirEspacios();
+      if (texto[indice] === "}") { indice += 1; return; }
+      while (indice < texto.length) {
+        omitirEspacios();
+        const llave = leerCadena().valor;
+        omitirEspacios();
+        if (texto[indice] !== ":") throw new Error("separador JSON esperado");
+        indice += 1;
+        recorrerValor(llave);
+        omitirEspacios();
+        if (texto[indice] === "}") { indice += 1; return; }
+        if (texto[indice] !== ",") throw new Error("coma JSON esperada");
+        indice += 1;
+      }
+      throw new Error("objeto JSON sin cierre");
+    }
+    if (caracter === "[") {
+      indice += 1;
+      omitirEspacios();
+      if (texto[indice] === "]") { indice += 1; return; }
+      while (indice < texto.length) {
+        recorrerValor();
+        omitirEspacios();
+        if (texto[indice] === "]") { indice += 1; return; }
+        if (texto[indice] !== ",") throw new Error("coma JSON esperada");
+        indice += 1;
+      }
+      throw new Error("lista JSON sin cierre");
+    }
+    while (indice < texto.length && !/[\s,\]}]/.test(texto[indice])) indice += 1;
+    if (indice === 0) throw new Error("valor JSON esperado");
+  };
+
+  try {
+    recorrerValor();
+    omitirEspacios();
+    if (indice !== texto.length) return null;
+  } catch {
+    return null;
+  }
+
+  let resultado = texto;
+  for (const rango of rangos.reverse()) {
+    resultado = resultado.slice(0, rango.inicio) + rango.reemplazo + resultado.slice(rango.fin);
+  }
+  return { texto: resultado, cantidad: rangos.length };
+}
+
+function redactarJsonOJsonl(texto) {
+  const documento = redactarDocumentoJson(texto);
+  if (documento) return documento;
+
+  const partes = [];
+  let inicio = 0;
+  let cantidad = 0;
+  let registros = 0;
+  for (let i = 0; i < texto.length; i += 1) {
+    if (texto[i] !== "\r" && texto[i] !== "\n") continue;
+    const linea = texto.slice(inicio, i);
+    const salto = texto[i] === "\r" && texto[i + 1] === "\n" ? "\r\n" : texto[i];
+    const procesada = linea.trim() ? redactarDocumentoJson(linea) : null;
+    if (linea.trim() && !procesada) return null;
+    if (procesada) { partes.push(procesada.texto); cantidad += procesada.cantidad; registros += 1; }
+    else partes.push(linea);
+    partes.push(salto);
+    if (salto.length === 2) i += 1;
+    inicio = i + 1;
+  }
+  if (inicio < texto.length) {
+    const linea = texto.slice(inicio);
+    const procesada = linea.trim() ? redactarDocumentoJson(linea) : null;
+    if (linea.trim() && !procesada) return null;
+    if (procesada) { partes.push(procesada.texto); cantidad += procesada.cantidad; registros += 1; }
+    else partes.push(linea);
+  }
+  return registros ? { texto: partes.join(""), cantidad } : null;
+}
 
 export function redactar(texto) {
   let resultado = texto;
@@ -60,6 +174,11 @@ export function redactar(texto) {
       if (inicioValor < 0) return marcador;
       return `${match.slice(0, inicioValor)}${marcador}${match.slice(inicioValor + valor.length)}`;
     });
+  }
+  const json = redactarJsonOJsonl(resultado);
+  if (json?.cantidad) {
+    resultado = json.texto;
+    conteo.asignacion_generica = (conteo.asignacion_generica ?? 0) + json.cantidad;
   }
   const hallazgos = Object.entries(conteo).map(([tipo, cantidad]) => ({ tipo, cantidad }));
   return { texto: resultado, hallazgos };
