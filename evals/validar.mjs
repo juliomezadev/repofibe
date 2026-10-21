@@ -326,6 +326,7 @@ await ejecutarPrueba("evals/seguridad/auth-rutas.mjs", "Confinamiento de perfile
 await ejecutarPrueba("evals/seguridad/instalacion-hosts-secundarios.mjs", "Seguridad Hosts Secundarios");
 await ejecutarPrueba("evals/nucleo/salud.mjs", "Salud");
 await ejecutarPrueba("evals/nucleo/secretos.mjs", "Secretos");
+await ejecutarPrueba("evals/nucleo/secretos-jsonl.mjs", "Redacción JSONL parseable");
 await ejecutarPrueba("evals/nucleo/navegador.mjs", "Navegador");
 await ejecutarPrueba("evals/nucleo/no-confiable.mjs", "No Confiable");
 await ejecutarPrueba("evals/seguridad/memoria-confianza.mjs", "Frontera de confianza de memoria");
