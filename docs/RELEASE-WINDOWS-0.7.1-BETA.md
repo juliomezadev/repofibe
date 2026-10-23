@@ -25,7 +25,8 @@ aprobaciones normales del host para operaciones sensibles.
 2. Comprueba el SHA-256 del ZIP publicado antes de extraerlo.
 3. Extrae el ZIP y ejecuta `instalar.ps1` desde la carpeta extraída. Para elegir
    un host, añade `-RepoHost codex`, `-RepoHost claude` u otro host compatible.
-4. Reinicia el host y comprueba el estado con `node nucleo/diagnostico.mjs`.
+4. Reinicia el host y comprueba la instalación con
+   `node "$env:USERPROFILE\.repofibe\app\nucleo\diagnostico.mjs" --json`.
 
 Para actualizar una instalación existente, ejecuta `instalar.ps1 -Refrescar`.
 El instalador conserva archivos de usuario que no administra; guarda una copia
