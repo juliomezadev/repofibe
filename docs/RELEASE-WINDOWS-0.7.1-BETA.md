@@ -22,7 +22,8 @@ aprobaciones normales del host para operaciones sensibles.
 
 1. Descarga `Repofibe-0.7.1-beta.1-windows-x64.zip` y `SHA256SUMS.txt` desde la
    misma publicación.
-2. Comprueba el SHA-256 del ZIP publicado antes de extraerlo.
+2. En PowerShell ejecuta `Get-FileHash .\Repofibe-0.7.1-beta.1-windows-x64.zip -Algorithm SHA256`
+   y compara el resultado con `SHA256SUMS.txt` antes de extraerlo.
 3. Extrae el ZIP y ejecuta `instalar.ps1` desde la carpeta extraída. Para elegir
    un host, añade `-RepoHost codex`, `-RepoHost claude` u otro host compatible.
 4. Reinicia el host y comprueba la instalación con
@@ -30,7 +31,9 @@ aprobaciones normales del host para operaciones sensibles.
 
 Para actualizar una instalación existente, ejecuta `instalar.ps1 -Refrescar`.
 El instalador conserva archivos de usuario que no administra; guarda una copia
-de seguridad antes de actualizar por primera vez.
+de seguridad antes de actualizar por primera vez. Conserva también el ZIP
+estable 0.7.0 que quieras usar para volver a esa versión; esta beta no incluye
+ni reemplaza el paquete estable.
 
 ## Uso
 
@@ -56,6 +59,6 @@ instalador del ZIP de REPOFIBE 0.7.0 con `-Refrescar`. Conserva la configuració
 skills personalizadas y datos antes de cambiar de versión; no borres a mano
 carpetas de instalación para hacer rollback.
 
-La distribución 0.7.0 de referencia se conserva por separado. La publicación
-adjunta sus hashes para que puedas verificar que el paquete descargado no
-cambió.
+La descarga de la beta no incluye el ZIP estable 0.7.0. Conserva ese archivo
+antes de actualizar si necesitas poder volver a la versión estable. El archivo
+`SHA256SUMS.txt` publicado junto a la beta permite verificar el ZIP beta.
