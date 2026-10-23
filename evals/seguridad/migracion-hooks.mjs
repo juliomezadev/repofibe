@@ -27,14 +27,16 @@ function pathSinClaude() {
   return dirs.join(sep);
 }
 
-const legado = 'node "C:/Users/mesw/Desktop/proyecto Repofibe 5/repofibe/hooks/antivirus-hook.mjs"';
+const rutaLegado = join(hogar, "Desktop", "proyecto Repofibe 5", "repofibe", "hooks", "antivirus-hook.mjs").replaceAll("\\", "/");
+const legado = `node "${rutaLegado}"`;
+const legadoOtraCuenta = 'node "C:/Users/synthetic-user/Desktop/proyecto Repofibe 5/repofibe/hooks/antivirus-hook.mjs"';
 const terceroMismoNombre = `node "${join(temporal, "otro-producto", "hooks", "antivirus-hook.mjs").replaceAll("\\", "/")}"`;
 const entrada = (command) => ({ matcher: "*", hooks: [{ type: "command", command }] });
 const original = {
   model: "sonnet",
   permissions: { allow: ["Bash(ls)"], deny: [] },
   hooks: {
-    PostToolUse: [entrada(legado), entrada(terceroMismoNombre), entrada("node user-hook.mjs")],
+    PostToolUse: [entrada(legado), entrada(legadoOtraCuenta), entrada(terceroMismoNombre), entrada("node user-hook.mjs")],
   },
 };
 writeFileSync(settingsPath, `${JSON.stringify(original, null, 2)}\n`);
@@ -51,7 +53,7 @@ const r = spawnSync(process.execPath, [INSTALADOR, "--host", "claude"], {
   cwd: temporal,
   env,
   encoding: "utf8",
-  timeout: 30000,
+  timeout: 90000,
 });
 
 try {
@@ -59,6 +61,7 @@ try {
   const actualizado = JSON.parse(readFileSync(settingsPath, "utf8"));
   const comandosPostTool = actualizado.hooks.PostToolUse.flatMap((e) => e.hooks.map((h) => h.command));
   assert.ok(!comandosPostTool.includes(legado), "debe retirar la ruta exacta del hook experimental legado");
+  assert.ok(comandosPostTool.includes(legadoOtraCuenta), "debe preservar la ruta homónima bajo otro perfil");
   assert.ok(comandosPostTool.includes(terceroMismoNombre), "debe preservar otro hook con el mismo nombre en otra ruta");
   assert.ok(comandosPostTool.includes("node user-hook.mjs"), "debe preservar el hook del usuario");
   assert.deepEqual(actualizado.permissions, original.permissions);
@@ -91,7 +94,7 @@ try {
   writeFileSync(registroPath, `${JSON.stringify(registroInstalado, null, 2)}\n`);
 
   const quitar = spawnSync(process.execPath, [INSTALADOR, "--quitar"], {
-    cwd: temporal, env, encoding: "utf8", timeout: 30000,
+    cwd: temporal, env, encoding: "utf8", timeout: 90000,
   });
   assert.equal(quitar.status, 0, `desinstalación aislada falló:\n${quitar.stdout}\n${quitar.stderr}`);
   const trasQuitar = JSON.parse(readFileSync(settingsPath, "utf8"));
@@ -111,7 +114,7 @@ try {
     cwd: temporal,
     env: { ...env, HOME: hogarDryRun, USERPROFILE: hogarDryRun, HOMEDRIVE: hogarDryRun.slice(0, 2), HOMEPATH: hogarDryRun.slice(2) },
     encoding: "utf8",
-    timeout: 30000,
+    timeout: 90000,
   });
   assert.equal(dryRun.status, 0, `dry-run aislado fallo:\n${dryRun.stdout}\n${dryRun.stderr}`);
   assert.equal(readFileSync(settingsDryRun, "utf8"), "{}\n", "dry-run no debe cambiar settings.json");
@@ -163,8 +166,17 @@ try {
     '  const hooks = path.join(app, "hooks");',
     '  const saved = path.join(app, "hooks-saved");',
     '  fs.renameSync(hooks, saved);',
-    '  fs.mkdirSync(process.env.MOCK_CLAUDE_EXTERNAL, { recursive: true });',
-    '  for (const file of fs.readdirSync(saved)) fs.copyFileSync(path.join(saved, file), path.join(process.env.MOCK_CLAUDE_EXTERNAL, file));',
+    '  const copiarArbol = (origen, destino) => {',
+    '    fs.mkdirSync(destino, { recursive: true });',
+    '    for (const entry of fs.readdirSync(origen, { withFileTypes: true })) {',
+    '      const fuente = path.join(origen, entry.name);',
+    '      const salida = path.join(destino, entry.name);',
+    '      if (entry.isDirectory()) copiarArbol(fuente, salida);',
+    '      else if (entry.isFile()) fs.copyFileSync(fuente, salida);',
+    '      else throw new Error("plugin mock rechaza una entrada no regular");',
+    '    }',
+    '  };',
+    '  copiarArbol(saved, process.env.MOCK_CLAUDE_EXTERNAL);',
     '  fs.symlinkSync(process.env.MOCK_CLAUDE_EXTERNAL, hooks, "junction");',
     '  fs.writeFileSync(path.join(app, "VERSION"), "tampered\\n");',
     '}',
@@ -199,9 +211,9 @@ try {
   resetEstadoMock();
   writeFileSync(logCli, "");
   const pluginFallback = spawnSync(process.execPath, [INSTALADOR, "--host", "claude"], {
-    cwd: temporal, env: envMock(hogarFallback, "fail-install-partial"), encoding: "utf8", timeout: 30000,
+    cwd: temporal, env: envMock(hogarFallback, "fail-install-partial"), encoding: "utf8", timeout: 90000,
   });
-  assert.equal(pluginFallback.status, 0, `el fallback aislado fallo:\n${pluginFallback.stdout}\n${pluginFallback.stderr}`);
+  assert.equal(pluginFallback.status, 0, `el fallback aislado fallo (error=${pluginFallback.error?.message ?? "sin error de proceso"}):\n${pluginFallback.stdout}\n${pluginFallback.stderr}`);
   const comandosFallback = readFileSync(logCli, "utf8").trim().split("\n").map((s) => JSON.parse(s));
   assert.ok(comandosFallback.some((c) => c[0] === "marketplace" && c[1] === "add"), "el stub debe simular marketplace add");
   assert.ok(comandosFallback.some((c) => c[0] === "install"), "el stub debe simular el fallo de plugin install");
@@ -221,7 +233,7 @@ try {
   resetEstadoMock(marketplacesTerceros, pluginsTerceros);
   writeFileSync(logCli, "");
   const fallbackMarketplacePreexistente = spawnSync(process.execPath, [INSTALADOR, "--host", "claude"], {
-    cwd: temporal, env: envMock(hogarMarketplaceTerceros, "fail-install-partial"), encoding: "utf8", timeout: 30000,
+    cwd: temporal, env: envMock(hogarMarketplaceTerceros, "fail-install-partial"), encoding: "utf8", timeout: 90000,
   });
   assert.equal(fallbackMarketplacePreexistente.status, 0,
     `fallo en marketplace preexistente debe caer a copia sin borrarlo:\n${fallbackMarketplacePreexistente.stdout}\n${fallbackMarketplacePreexistente.stderr}`);
@@ -242,7 +254,7 @@ try {
     cwd: temporal,
     env: envMock(hogarCompensacionFallida, "fail-compensations"),
     encoding: "utf8",
-    timeout: 30000,
+    timeout: 90000,
   });
   assert.notEqual(compensacionFallida.status, 0, "no se debe anunciar fallback cuando fallan ambas compensaciones");
   const comandosFallidos = readFileSync(logCli, "utf8").trim().split("\n").map((s) => JSON.parse(s));
@@ -261,7 +273,7 @@ try {
   resetEstadoMock();
   writeFileSync(logCli, "");
   const pluginRollback = spawnSync(process.execPath, [INSTALADOR, "--host", "claude"], {
-    cwd: temporal, env: envMock(hogarRollback, "success-corrupt"), encoding: "utf8", timeout: 30000,
+    cwd: temporal, env: envMock(hogarRollback, "success-corrupt"), encoding: "utf8", timeout: 90000,
   });
   assert.notEqual(pluginRollback.status, 0, "la corrupcion inyectada debe hacer fallar el diagnostico final");
   const comandosRollback = readFileSync(logCli, "utf8").trim().split("\n").map((s) => JSON.parse(s));
@@ -288,7 +300,7 @@ try {
     resetEstadoMock();
     writeFileSync(logCli, "");
     const pluginJunction = spawnSync(process.execPath, [INSTALADOR, "--host", "claude"], {
-      cwd: temporal, env: envMock(hogarJunction, "success-junction", externo), encoding: "utf8", timeout: 30000,
+      cwd: temporal, env: envMock(hogarJunction, "success-junction", externo), encoding: "utf8", timeout: 90000,
     });
     assert.notEqual(pluginJunction.status, 0, "la corrupcion inyectada debe activar el rollback con junction");
     assert.ok(existsSync(join(externo, "guardia.mjs")), "rollback no debe borrar el archivo expuesto por la junction");

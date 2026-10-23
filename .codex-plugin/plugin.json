@@ -1,0 +1,7 @@
+{
+  "name": "repofibe",
+  "version": "0.7.1-beta.1",
+  "description": "Skills y guardia ejecutable limitada a hooks locales de Codex confiados por el usuario.",
+  "skills": "./skills",
+  "hooks": "./hooks/codex/hooks.json"
+}

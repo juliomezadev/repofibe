@@ -1,0 +1,18 @@
+{
+  "description": "Guardia acotada de REPOFIBE para operaciones locales que Codex expone a PreToolUse.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex/guardia.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Comprobando alcance y riesgo de la operación"
+          }
+        ]
+      }
+    ]
+  }
+}

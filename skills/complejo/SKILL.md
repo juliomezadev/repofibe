@@ -96,10 +96,17 @@ Para cada subproblema, en orden:
    las interacciones, no en las piezas.
 6. Actualizar cuaderno: BITÁCORA + árbol (¿la realidad cambió el plan?).
 
-**Paralelismo:** si el host soporta subagentes (Claude Code), los
-subproblemas `[independiente]` pueden ir en paralelo — cada subagente recibe
-el cuaderno + su subproblema como brief autocontenido, y sus resultados
-vuelven al cuaderno por el coordinador.
+**Paralelismo:** si el host soporta subagentes, solo los subproblemas
+`[independiente]` pueden ir en paralelo. Antes de asignarlos, el coordinador
+define rutas exclusivas y contratos compartidos, y prepara ramas/worktrees
+aislados con `<RAIZ>/nucleo/agentes-git.mjs`. Cada agente recibe el brief y la
+ruta de su worktree — nunca la ruta coordinadora. El coordinador valida
+ownership y cambios concurrentes, integra en el worktree dedicado y ejecuta
+la suite acordada. Si la base está sucia, hay solapamiento, el host no admite
+aislamiento o no se puede establecer el contrato, no paralelices: usa el modo
+secuencial. No limpies ni elimines worktrees/ramas fallidos; conserva el run y
+registra su recuperación. El procedimiento, el formato del plan y sus límites
+están en `<RAIZ>/docs/COORDINACION-GIT.md`.
 
 ## Fase 7 — Hitos (cada ~3 subproblemas o al 50%)
 

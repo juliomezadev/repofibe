@@ -121,7 +121,7 @@ const APP = join(HOGAR, ".repofibe", "app");
 const REGISTRO = join(HOGAR, ".repofibe", "instalado.json");
 const MARCA_INICIO = "<!-- repofibe:inicio -->";
 const MARCA_FIN = "<!-- repofibe:fin -->";
-const LEGADO_ANTIVIRUS = 'node "C:/Users/mesw/Desktop/proyecto Repofibe 5/repofibe/hooks/antivirus-hook.mjs"';
+const LEGADO_ANTIVIRUS = `node "${join(HOGAR, "Desktop", "proyecto Repofibe 5", "repofibe", "hooks", "antivirus-hook.mjs").replaceAll("\\", "/")}"`;
 let manifiestoFuente = null;
 let transaccion = null;
 

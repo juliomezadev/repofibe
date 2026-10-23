@@ -10,15 +10,15 @@ Inspirado en [gstack](https://github.com/garrytan/gstack) de Garry Tan —
 y rediseñado desde cero con una tesis distinta:
 
 > **Cada garantía que pueda ser determinista, se baja al harness.**
-> Un prompt que dice "ten cuidado con rm -rf" se olvida.
-> Un hook que intercepta el comando, jamás.
+> Un prompt puede olvidarse; un hook bloquea una llamada solo si está habilitado,
+> confiado y la herramienta pasa por una ruta que el host soporta.
 
 ## Las cinco diferencias estructurales
 
 | | gstack | repofibe |
 |---|---|---|
 | **Instalación** | git clone + symlinks + editar CLAUDE.md (los symlinks se rompen en Windows) | Plugin nativo de Claude Code / copias planas sin requisito de symlinks |
-| **Guardias** | `/careful` es un prompt: el modelo puede olvidarlo | Hook PreToolUse: el harness lo ejecuta SIEMPRE (destructivos → confirmar; congelado → denegar) |
+| **Guardias** | `/careful` es un prompt | Claude Code usa hooks al habilitarlos. Codex puede usar el plugin local con `PreToolUse`, después de instalarlo y confiarlo; cubre rutas documentadas y no es un sandbox universal. |
 | **Estado del sprint** | Implícito en documentos sueltos | `.fabrica/sprint.json` explícito: etapa, historial, pendientes. Cualquier sesión retoma donde quedó |
 | **Docs de skills** | Plantillas + build step (drift si no rebuildeas) | Sin codegen: un SKILL.md por skill, bloques compartidos leídos en runtime |
 | **Multi-host** | 10 hosts vía setup TypeScript | Estándar Agent Skills puro: Claude Code, Antigravity, Codex, Cursor, OpenCode y cualquier IDE que lo adopte |
@@ -27,10 +27,11 @@ Todo en español: skills, mensajes, docs, commits.
 
 ## Instalación
 
-La guía del paquete de esta versión está en
-[RELEASE-WINDOWS-0.7.0.md](docs/RELEASE-WINDOWS-0.7.0.md). Windows x64 es la
-plataforma objetivo validada para 0.7.0; Linux y macOS siguen pendientes de
-certificación.
+La guía de Windows x64 de 0.7.0 está en
+[RELEASE-WINDOWS-0.7.0.md](docs/RELEASE-WINDOWS-0.7.0.md). Los cambios
+de esta beta y sus límites se describen en
+[RELEASE-WINDOWS-0.7.1-BETA.md](docs/RELEASE-WINDOWS-0.7.1-BETA.md).
+Linux y macOS siguen pendientes de certificación.
 
 **Requisitos del paquete ZIP para Windows:** Windows x64 y
 [Node.js](https://nodejs.org) 22 o superior (24 recomendado); Git no es
@@ -79,11 +80,15 @@ IDE: `--host generico --workspace <ruta>` (skills + bloque en AGENTS.md).
 - **Desinstalar:** `instalar.ps1 -Quitar` / `./instalar.sh --quitar` — limpia
   todo lo que instaló (lo registra en `~/.repofibe/instalado.json`).
 
-### Los hooks deterministas (verifica que estén activos)
+### Hooks deterministas
 
-Los guardias de clase 1 —confirmación ante comandos destructivos, congelamiento
-de directorio, contexto al abrir sesión— viven en hooks, y los hooks **no se
-cargan con solo copiar las skills**.
+Los hooks no se cargan con solo copiar las skills. En Claude Code, el instalador
+registra las guardias compatibles con ese host. En Codex, el hook `PreToolUse`
+está dentro del plugin local `.codex-plugin`; hay que instalar el plugin en
+Codex y revisar/confiar su definición para que pueda ejecutarse. El hook puede
+denegar acciones sobre rutas soportadas, pero una herramienta especializada,
+un hook sin confianza o un error del propio hook pueden quedar fuera de esa
+barrera. Consulta [GUARDIA-CODEX.md](docs/GUARDIA-CODEX.md).
 
 ```bash
 node nucleo/instalar.mjs --hooks   # actívalos y reinicia Claude Code

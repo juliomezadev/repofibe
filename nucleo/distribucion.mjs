@@ -16,17 +16,23 @@ export const RUTAS_REQUERIDAS = Object.freeze([
   "package.json",
   "package-lock.json",
   "nucleo/distribucion.mjs",
+  "nucleo/ejecutar-seguro.mjs",
+  "nucleo/modo-ligero.mjs",
+  "nucleo/agentes-git.mjs",
   "nucleo/diagnostico.mjs",
   "nucleo/instalar.mjs",
   "hooks/guardia.mjs",
+  "hooks/codex/guardia.mjs",
+  "hooks/codex/hooks.json",
   "hooks/sesion.mjs",
   "plantillas/preambulo.md",
+  ".codex-plugin/plugin.json",
 ]);
 
 const RAIZ_MODULO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RAICES_PRODUCTO = Object.freeze([
   "FILOSOFIA.md", "VERSION", "package.json", "package-lock.json",
-  ".claude-plugin", "hooks", "nucleo", "plantillas", "skills",
+  ".claude-plugin", ".codex-plugin", "hooks", "nucleo", "plantillas", "skills",
 ]);
 const EXCLUIDOS = new Set([
   "hooks/antivirus-hook.mjs",

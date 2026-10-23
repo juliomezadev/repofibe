@@ -2,7 +2,26 @@
 
 Todas las novedades de repofibe, versión por versión.
 
-## [Unreleased] — candidato 0.7.0
+## [0.7.1-beta.1] — 2026-10-23
+
+### Mejoras
+- Guardia Codex empaquetada como hook `PreToolUse` y wrapper acotado con
+  evidencia local; el alcance depende de instalar y confiar el plugin. Los
+  hooks son una barrera útil en las rutas soportadas, no un sandbox universal.
+- Modo ligero conservador para tareas pequeñas, con promoción automática a
+  estricto ante cambios críticos o incertidumbre; incluye selección de pruebas
+  afectadas y revisión del diff.
+- Protocolo Git para subagentes con ownership explícito, worktrees aislados,
+  detección de escrituras concurrentes y validación posterior a integración.
+- La limpieza del hook legado identifica la ruta bajo el perfil local sin
+  incluir nombres de usuario ni rutas personales en el código distribuido.
+
+### Verificación
+- Evaluación local sintética en Windows x64 con Node.js 22.23.4 y 24.22.1.
+  La guardia nativa de Codex no se ha validado en una sesión real y se entrega
+  como experimental; no se afirma mejora de tiempo sin una medición comparable.
+
+## [0.7.0] — alcance Windows x64
 
 ### Mejoras
 - El instalador y el paquete fijan Node.js 22 como mínimo y recomiendan Node

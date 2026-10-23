@@ -25,7 +25,7 @@ cpSync(RAIZ, fuente, {
     const rel = relative(RAIZ, path);
     if (!rel) return true;
     const partes = rel.split(sep);
-    return [".claude-plugin", "hooks", "nucleo", "plantillas", "skills"].includes(partes[0]) ||
+    return [".claude-plugin", ".codex-plugin", "hooks", "nucleo", "plantillas", "skills"].includes(partes[0]) ||
       ["VERSION", "FILOSOFIA.md", "package.json", "package-lock.json"].includes(rel);
   },
 });
@@ -33,7 +33,7 @@ const gitOpts = { stdio: "ignore" };
 execFileSync("git", ["-C", fuente, "init", "--quiet"], gitOpts);
 execFileSync("git", ["-C", fuente, "config", "user.email", "eval@example.invalid"], gitOpts);
 execFileSync("git", ["-C", fuente, "config", "user.name", "Repofibe eval"], gitOpts);
-execFileSync("git", ["-C", fuente, "add", "VERSION", "FILOSOFIA.md", "package.json", "package-lock.json", ".claude-plugin", "hooks", "nucleo", "plantillas", "skills"], gitOpts);
+execFileSync("git", ["-C", fuente, "add", "VERSION", "FILOSOFIA.md", "package.json", "package-lock.json", ".claude-plugin", ".codex-plugin", "hooks", "nucleo", "plantillas", "skills"], gitOpts);
 execFileSync("git", ["-C", fuente, "commit", "--quiet", "-m", "fixture de distribución"], gitOpts);
 // Simula los dos experimentos fuera de Git, igual que en la auditoría.
 writeFileSync(join(fuente, "hooks", "antivirus-hook.mjs"), "throw new Error('experimento');\n");
@@ -88,6 +88,8 @@ try {
   assert.ok(Array.isArray(manifiesto.archivos) && manifiesto.archivos.length > 0);
   assert.ok(manifiesto.archivos.some((f) => f.ruta === "nucleo/diagnostico.mjs"));
   assert.ok(manifiesto.archivos.some((f) => f.ruta === "hooks/guardia.mjs"));
+  assert.ok(manifiesto.archivos.some((f) => f.ruta === ".codex-plugin/plugin.json"));
+  assert.ok(manifiesto.archivos.some((f) => f.ruta === "hooks/codex/hooks.json"));
   assert.ok(!manifiesto.archivos.some((f) => /^(?:hooks\/antivirus-hook\.mjs|nucleo\/antivirus\.mjs)$/.test(f.ruta)),
     "la distribución estable debe excluir los dos archivos experimentales");
   assert.ok(!existsSync(join(app, "hooks", "antivirus-hook.mjs")) && !existsSync(join(app, "nucleo", "antivirus.mjs")),
